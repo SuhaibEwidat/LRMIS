@@ -1,4 +1,4 @@
-async def list_applications_service(repository, skip=0, limit=10, filters=None):
+def list_applications_service(repository, skip=0, limit=10, filters=None):
 
     query = filters if filters else {}
 
@@ -8,7 +8,7 @@ async def list_applications_service(repository, skip=0, limit=10, filters=None):
         .limit(limit)
     )
 
-    total = await repository.collection.count_documents(query)
+    total = repository.collection.count_documents(query)
 
     return {
         "data": data,

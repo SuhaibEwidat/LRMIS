@@ -1,8 +1,8 @@
 from datetime import datetime
-from LRMIS.services.application_service  import can_transition
+from LRMIS_BACKEND.services.application_service  import can_transition
 
 
-async def transition_application_service(app, new_state, repository):
+def transition_application_service(app, new_state, repository):
 
     current_state = app["workflow"]["current_state"]
 
@@ -12,7 +12,7 @@ async def transition_application_service(app, new_state, repository):
         }
 
     # update state
-    await repository.collection.update_one(
+    repository.collection.update_one(
         {"application_id": app["application_id"]},
         {
             "$set": {

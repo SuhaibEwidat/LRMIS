@@ -1,5 +1,5 @@
 from datetime import datetime
-from LRMIS.core.enums import ApplicationStatus
+from LRMIS_BACKEND.core.enums import ApplicationStatus
 
 
 def generate_application_id(last_number: int):

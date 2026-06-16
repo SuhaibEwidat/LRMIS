@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient as MongoClient
+from pymongo import MongoClient
 
 load_dotenv()
 
@@ -12,6 +12,7 @@ if not MONGO_URI or not DB_NAME:
 
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
+
 
 def get_database():
     return db

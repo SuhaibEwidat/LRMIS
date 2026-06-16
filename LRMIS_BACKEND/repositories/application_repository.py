@@ -1,16 +1,16 @@
-from LRMIS.database.database import get_database
+from LRMIS_BACKEND.database.database import get_database
 
 db = get_database()
 collection = db["land_applications"]
 
 
-async def create_application(application: dict):
-    return await collection.insert_one(application)
+def create_application(application: dict):
+    return  collection.insert_one(application)
 
 
-async def get_application_by_id(app_id: str):
-    return  await collection.find_one({"application_id": app_id})
+def get_application_by_id(app_id: str):
+    return   collection.find_one({"application_id": app_id})
 
 
-async def list_applications(query: dict, skip: int, limit: int):
-    return await list(collection.find(query).skip(skip).limit(limit))
+def list_applications(query: dict, skip: int, limit: int):
+    return list(collection.find(query).skip(skip).limit(limit))

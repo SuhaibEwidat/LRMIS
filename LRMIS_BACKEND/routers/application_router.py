@@ -1,21 +1,21 @@
 from fastapi import APIRouter, HTTPException, Query
-from LRMIS.schemas.application_schema import ApplicationCreate
+from LRMIS_BACKEND.schemas.application_schema import ApplicationCreate
 
-from LRMIS.services.create_application_service import create_application_service
-from LRMIS.services.get_application_service import get_application_service
-from LRMIS.services.List_applications_service import list_applications_service
-from LRMIS.services.transition_service import transition_application_service
+from LRMIS_BACKEND.services.create_application_service import create_application_service
+from LRMIS_BACKEND.services.get_application_service import get_application_service
+from LRMIS_BACKEND.services.List_applications_service import list_applications_service
+from LRMIS_BACKEND.services.transition_service import transition_application_service
 
 
-from  LRMIS.repositories.application_repository import collection
+from  LRMIS_BACKEND.repositories.application_repository import collection
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
 
 @router.post("/")
-async def create_application(payload: ApplicationCreate, idempotency_key: str = None):
+def create_application(payload: ApplicationCreate, idempotency_key: str = None):
 
-    result = await create_application_service(
+    result = create_application_service(
         data=payload.dict(),
         repository=type("Repo", (), {"collection": collection}),
         idempotency_key=idempotency_key
@@ -24,9 +24,9 @@ async def create_application(payload: ApplicationCreate, idempotency_key: str = 
     return result
 
 @router.get("/{application_id}")
-async def get_application(application_id: str):
+def get_application(application_id: str):
 
-    result = await get_application_service(application_id, type("Repo", (), {"collection": collection}))
+    result =  get_application_service(application_id, type("Repo", (), {"collection": collection}))
 
     if not result:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -34,7 +34,7 @@ async def get_application(application_id: str):
     return result
 
 @router.get("/")
-async def list_applications(
+def list_applications(
     skip: int = 0,
     limit: int = 10,
     status: str = None,
@@ -53,7 +53,7 @@ async def list_applications(
     if zone_id:
         filters["parcel_ref.zone_id"] = zone_id
 
-    result = await list_applications_service(
+    result =  list_applications_service(
         repository=type("Repo", (), {"collection": collection}),
         skip=skip,
         limit=limit,
@@ -63,9 +63,9 @@ async def list_applications(
     return result
 
 @router.patch("/{application_id}/transition")
-async def transition(application_id: str, new_state: str):
+def transition(application_id: str, new_state: str):
 
-    app =await collection.find_one({"application_id": application_id})
+    app =collection.find_one({"application_id": application_id})
 
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -78,9 +78,9 @@ async def transition(application_id: str, new_state: str):
     return result
 
 @router.post("/{application_id}/hold")
-async def hold_application(application_id: str, reason: str):
+def hold_application(application_id: str, reason: str):
 
-    result = await collection.update_one(
+    result = collection.update_one(
         {"application_id": application_id},
         {
             "$set": {
@@ -94,12 +94,12 @@ async def hold_application(application_id: str, reason: str):
 
 
 @router.post("/{application_id}/reject")
-async def reject_application(application_id: str, reason: str):
+def reject_application(application_id: str, reason: str):
 
     if not reason:
         raise HTTPException(status_code=400, detail="Rejection reason required")
 
-    await collection.update_one(
+    collection.update_one(
         {"application_id": application_id},
         {
             "$set": {
