@@ -25,8 +25,8 @@ def application_model(data: dict):
         "required_documents": data.get("required_documents", []),
 
         "timestamps": {
-            "submitted_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "submitted_at": datetime.now(),
+            "updated_at": datetime.now()
         },
 
         "assignment": {

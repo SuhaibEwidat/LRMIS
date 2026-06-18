@@ -1,32 +1,32 @@
 from fastapi import APIRouter, HTTPException, Query
-from LRMIS_BACKEND.schemas.application_schema import ApplicationCreate
+from LRMIS_BACKEND.schemas.application_schema import ApplicationCreate 
 
-from LRMIS_BACKEND.services.create_application_service import create_application_service
-from LRMIS_BACKEND.services.get_application_service import get_application_service
-from LRMIS_BACKEND.services.List_applications_service import list_applications_service
-from LRMIS_BACKEND.services.transition_service import transition_application_service
+from LRMIS_BACKEND.services.Module1.application_service import create_application_service, get_application_service, list_applications_service
+from LRMIS_BACKEND.services.Module1.certificate_service import issue_certificate_service
+from LRMIS_BACKEND.services.Module1.transition_service import hold_application_service, transition_application_service
 
-
-from  LRMIS_BACKEND.repositories.application_repository import collection
-
+# create router /applications
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
 
+
+# create application
 @router.post("/")
 def create_application(payload: ApplicationCreate, idempotency_key: str = None):
 
     result = create_application_service(
         data=payload.dict(),
-        repository=type("Repo", (), {"collection": collection}),
         idempotency_key=idempotency_key
     )
 
     return result
 
+
+#get application by id
 @router.get("/{application_id}")
 def get_application(application_id: str):
 
-    result =  get_application_service(application_id, type("Repo", (), {"collection": collection}))
+    result =  get_application_service(application_id)
 
     if not result:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -54,7 +54,6 @@ def list_applications(
         filters["parcel_ref.zone_id"] = zone_id
 
     result =  list_applications_service(
-        repository=type("Repo", (), {"collection": collection}),
         skip=skip,
         limit=limit,
         filters=filters
@@ -65,30 +64,17 @@ def list_applications(
 @router.patch("/{application_id}/transition")
 def transition(application_id: str, new_state: str):
 
-    app =collection.find_one({"application_id": application_id})
-
-    if not app:
-        raise HTTPException(status_code=404, detail="Application not found")
-
-    result = transition_application_service(app, new_state, type("Repo", (), {"collection": collection}))
-
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
+    result = transition_application_service(application_id, new_state)
 
     return result
 
 @router.post("/{application_id}/hold")
 def hold_application(application_id: str, reason: str):
 
-    result = collection.update_one(
-        {"application_id": application_id},
-        {
-            "$set": {
-                "workflow.current_state": "on_hold",
-                "internal.notes": [reason]
-            }
-        }
-    )
+    if not reason:
+        raise HTTPException(status_code=400, detail="Hold reason required")
+   
+ 
 
     return {"message": "Application put on hold"}
 
@@ -110,3 +96,10 @@ def reject_application(application_id: str, reason: str):
     )
 
     return {"message": "Application rejected"}
+
+# certificate
+@router.get("/{application_id}/certificate")
+def get_certificate(application_id: str, registrar_id: str):
+
+  
+    return issue_certificate_service(application_id, registrar_id)
