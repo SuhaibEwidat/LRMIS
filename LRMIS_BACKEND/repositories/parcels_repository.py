@@ -1,4 +1,4 @@
-from LRMIS_BACKEND.database.database import get_database
+from database.database import get_database
 
 db = get_database()
 collection = db["parcels"]

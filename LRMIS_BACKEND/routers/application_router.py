@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query
-from LRMIS_BACKEND.schemas.application_schema import ApplicationCreate 
+from schemas.application_schema import ApplicationCreate 
 
-from LRMIS_BACKEND.services.Module1.application_service import create_application_service, get_application_service, list_applications_service
-from LRMIS_BACKEND.services.Module1.certificate_service import issue_certificate_service
-from LRMIS_BACKEND.services.Module1.transition_service import hold_application_service, transition_application_service
+from services.Module1.application_service import create_application_service, get_application_service, list_applications_service
+from services.Module1.certificate_service import issue_certificate_service
+from services.Module1.transition_service import hold_application_service, transition_application_service
 
 # create router /applications
 router = APIRouter(prefix="/applications", tags=["Applications"])

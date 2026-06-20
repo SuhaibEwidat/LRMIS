@@ -1,9 +1,9 @@
 from datetime import datetime
-from LRMIS_BACKEND.core.enums import ApplicationStatus
-from LRMIS_BACKEND.services.Module1.workflow_rules import can_transition
-from LRMIS_BACKEND.services.Module1.field_validation_engine import validate_fields_for_transition
-from LRMIS_BACKEND.repositories.application_repository import ApplicationRepository
-from LRMIS_BACKEND.services.Module1.performance_log_service import log_event
+from core.enums import ApplicationStatus
+from services.Module1.workflow_rules import can_transition
+from services.Module1.field_validation_engine import validate_fields_for_transition
+from repositories.application_repository import ApplicationRepository
+from services.Module1.performance_log_service import log_event
 
 repo = ApplicationRepository()
 

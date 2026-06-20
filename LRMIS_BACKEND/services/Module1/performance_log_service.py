@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from LRMIS_BACKEND.repositories.audit_repository import AuditRepository
+from repositories.audit_repository import AuditRepository
 
 repo = AuditRepository()
 

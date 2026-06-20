@@ -1,5 +1,5 @@
-from LRMIS_BACKEND.models.parcels_model import parcel_model
-from LRMIS_BACKEND.repositories.parcels_repository import ParcelsRepository
+from models.parcels_model import parcel_model
+from repositories.parcels_repository import ParcelsRepository
 
 repo = ParcelsRepository()
 

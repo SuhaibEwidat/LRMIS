@@ -1,5 +1,5 @@
-from LRMIS_BACKEND.core.enums import ApplicationStatus
-from LRMIS_BACKEND.services.Module1.geo_validation_engine import validate_geojson
+from core.enums import ApplicationStatus
+from services.Module1.geo_validation_engine import validate_geojson
 
 
 def validate_fields_for_transition(application: dict, new_state: str):

@@ -1,6 +1,6 @@
 from datetime import datetime
-from LRMIS_BACKEND.repositories.application_repository import ApplicationRepository
-from LRMIS_BACKEND.services.Module1.performance_log_service import log_event
+from repositories.application_repository import ApplicationRepository
+from services.Module1.performance_log_service import log_event
 
 repo = ApplicationRepository()
 

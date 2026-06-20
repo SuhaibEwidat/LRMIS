@@ -1,4 +1,4 @@
-from LRMIS_BACKEND.core.enums import ApplicationStatus
+from core.enums import ApplicationStatus
 
 
 WORKFLOW_RULES = {

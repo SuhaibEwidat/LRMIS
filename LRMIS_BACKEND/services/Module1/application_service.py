@@ -1,7 +1,7 @@
 from datetime import datetime
-from LRMIS_BACKEND.core.enums import ApplicationStatus
-from LRMIS_BACKEND.models import application_model
-from LRMIS_BACKEND.repositories.application_repository import ApplicationRepository
+from core.enums import ApplicationStatus
+from models import application_model
+from repositories.application_repository import ApplicationRepository
 
 repo = ApplicationRepository()
 

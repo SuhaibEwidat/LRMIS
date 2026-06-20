@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from LRMIS_BACKEND.core.enums import ApplicationStatus
-from LRMIS_BACKEND.models import certificate_model
-from LRMIS_BACKEND.repositories.application_repository import ApplicationRepository
-from LRMIS_BACKEND.repositories.certificate_repository import CertificateRepository
-from LRMIS_BACKEND.services.Module1.performance_log_service import log_event
+from core.enums import ApplicationStatus
+from models import certificate_model
+from repositories.application_repository import ApplicationRepository
+from repositories.certificate_repository import CertificateRepository
+from services.Module1.performance_log_service import log_event
 
 
 def generate_certificate_id(last_number: int):
