@@ -1,17 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  getSurveyorTasks,
-  scheduleVisit,
+  getStaffProfile,
   updateSurveyMilestone,
-  addFieldNote,
   uploadSurveyReport,
 } from "../../api/model3Api";
 
-import Header from "../components/Header/Header.jsx";
-import Navigation from "../components/Navigation/Navigation.jsx";
 import "./SurveyorPage.css";
 
-const MILESTONE_ORDER = [
+const MILESTONES = [
   "assigned",
   "visit_scheduled",
   "arrived_on_site",
@@ -22,6 +18,7 @@ const MILESTONE_ORDER = [
 ];
 
 const NEXT_MILESTONE = {
+  assigned: "visit_scheduled",
   visit_scheduled: "arrived_on_site",
   arrived_on_site: "survey_started",
   survey_started: "survey_completed",
@@ -32,6 +29,30 @@ function formatStatus(status) {
   return status.replaceAll("_", " ");
 }
 
+function getNextMilestoneLabel(status) {
+  const next = NEXT_MILESTONE[status];
+
+  if (next === "visit_scheduled") return "Schedule Visit";
+  if (next === "arrived_on_site") return "Mark Arrived On Site";
+  if (next === "survey_started") return "Start Survey";
+  if (next === "survey_completed") return "Complete Survey";
+
+  return null;
+}
+
+function getProgressIndex(status) {
+  const index = MILESTONES.indexOf(status);
+  return index === -1 ? 0 : index;
+}
+
+function canUploadReport(task) {
+  return task?.status === "survey_completed";
+}
+
+function getTaskKey(task) {
+  return task?._id || task?.task_id || task?.application_id || "";
+}
+
 function getUserFromStorage() {
   try {
     return JSON.parse(localStorage.getItem("lrmis_user") || "{}");
@@ -40,295 +61,406 @@ function getUserFromStorage() {
   }
 }
 
-function RefreshIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <polyline points="23 4 23 10 17 10" />
-      <polyline points="1 20 1 14 7 14" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-  );
+function getErrorMessage(error, fallbackMessage) {
+  const detail = error.response?.data?.detail;
+
+  if (Array.isArray(detail)) {
+    return detail.map((item) => item.msg || JSON.stringify(item)).join(", ");
+  }
+
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (detail) {
+    return JSON.stringify(detail);
+  }
+
+  return fallbackMessage;
 }
 
 function SurveyorPage() {
   const [user, setUser] = useState({});
+  const [staffProfile, setStaffProfile] = useState(null);
   const [tasks, setTasks] = useState([]);
+
   const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedTaskKey, setSelectedTaskKey] = useState("");
 
-  const [visitDate, setVisitDate] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
   const [fieldNote, setFieldNote] = useState("");
+  const [localNotes, setLocalNotes] = useState([]);
 
-  const [reportForm, setReportForm] = useState({
+  const [reportData, setReportData] = useState({
     report_title: "",
     summary: "",
-    file_name: "",
-    file_url: "",
   });
+
+  const [reportFile, setReportFile] = useState(null);
 
   const [loading, setLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-
-  const [message, setMessage] = useState({
-    text: "",
-    type: "",
-  });
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     const storedUser = getUserFromStorage();
     setUser(storedUser);
+    loadSurveyorData(storedUser);
+  }, []);
 
-    const role = storedUser.role || storedUser.staff_role;
-
-    if (storedUser.account_type !== "staff" || role !== "surveyor") {
-      setMessage({
-        text: "Access denied. This page is only for surveyors.",
-        type: "error",
-      });
+  useEffect(() => {
+    if (!selectedTaskKey) {
       return;
     }
 
-    loadTasks(storedUser);
-  }, []);
+    const updatedSelectedTask = tasks.find(
+      (task) => getTaskKey(task) === selectedTaskKey
+    );
 
-  async function loadTasks(currentUser = user) {
-    const surveyorId =
-      currentUser._id ||
-      currentUser.id ||
-      currentUser.staff_id ||
-      currentUser.staff_code;
+    if (updatedSelectedTask) {
+      setSelectedTask(updatedSelectedTask);
+    }
+  }, [tasks, selectedTaskKey]);
 
-    if (!surveyorId) {
-      setMessage({
-        text: "Surveyor ID not found. Please login again.",
-        type: "error",
+  useEffect(() => {
+    if (selectedTask) {
+      setScheduledDate(selectedTask.scheduled_visit_date || "");
+      setLocalNotes(selectedTask.field_notes || []);
+      setFieldNote("");
+      setReportFile(null);
+
+      setReportData({
+        report_title: "",
+        summary: "",
       });
+    }
+  }, [selectedTask]);
+
+  async function loadSurveyorData(currentUser) {
+    const staffId =
+      currentUser?._id ||
+      currentUser?.id ||
+      currentUser?.staff_id ||
+      currentUser?.staff_code;
+
+    if (!staffId) {
+      setMessage("Surveyor ID not found. Please login again.");
       return;
     }
 
     try {
       setLoading(true);
-      setMessage({ text: "", type: "" });
+      setMessage("");
 
-      const response = await getSurveyorTasks(surveyorId);
-      const loadedTasks = response.data.tasks || [];
+      const response = await getStaffProfile(staffId);
+      const assignedTasks = response.data.assigned_tasks || [];
 
-      setTasks(loadedTasks);
+      setStaffProfile(response.data);
+      setTasks(assignedTasks);
 
-      if (selectedTask) {
-        const updatedSelected = loadedTasks.find(
-          (task) =>
-            task._id === selectedTask._id ||
-            task.task_id === selectedTask.task_id
+      if (selectedTaskKey) {
+        const updatedSelectedTask = assignedTasks.find(
+          (task) => getTaskKey(task) === selectedTaskKey
         );
 
-        setSelectedTask(updatedSelected || null);
+        if (updatedSelectedTask) {
+          setSelectedTask(updatedSelectedTask);
+        }
       }
     } catch (error) {
-      setMessage({
-        text:
-          error.response?.data?.detail ||
-          "Failed to load survey tasks.",
-        type: "error",
-      });
+      setMessage(getErrorMessage(error, "Failed to load surveyor data."));
     } finally {
       setLoading(false);
     }
   }
 
+  function updateTaskLocally(updatedTask) {
+    if (!updatedTask) return;
+
+    const updatedKey = getTaskKey(updatedTask);
+
+    setSelectedTask(updatedTask);
+    setSelectedTaskKey(updatedKey);
+
+    setTasks((previousTasks) =>
+      previousTasks.map((task) => {
+        if (getTaskKey(task) === updatedKey) {
+          return updatedTask;
+        }
+
+        return task;
+      })
+    );
+  }
+
   function handleSelectTask(task) {
     setSelectedTask(task);
-    setVisitDate(task.scheduled_visit_date || "");
-    setFieldNote("");
+    setSelectedTaskKey(getTaskKey(task));
 
-    setReportForm({
+    setScheduledDate(task.scheduled_visit_date || "");
+    setLocalNotes(task.field_notes || []);
+    setFieldNote("");
+    setReportFile(null);
+
+    setReportData({
       report_title: "",
       summary: "",
-      file_name: "",
-      file_url: "",
     });
 
-    setMessage({ text: "", type: "" });
+    setMessage("");
   }
 
-  async function handleScheduleVisit() {
-    if (!selectedTask) return;
+  async function handleNextMilestone() {
+    if (loading) return;
 
-    if (!visitDate) {
-      setMessage({
-        text: "Please select a visit date.",
-        type: "error",
-      });
+    if (!selectedTask) {
+      setMessage("Please select a task first.");
       return;
     }
 
-    try {
-      setActionLoading(true);
-      setMessage({ text: "", type: "" });
+    const latestSelectedTask =
+      tasks.find((task) => getTaskKey(task) === selectedTaskKey) ||
+      selectedTask;
 
-      await scheduleVisit(selectedTask.application_id, {
-        scheduled_visit_date: visitDate,
-        by: user.staff_code || user._id || user.staff_id,
-      });
+    const currentStatus = String(latestSelectedTask.status || "").trim();
 
-      setMessage({
-        text: "Visit scheduled successfully.",
-        type: "success",
-      });
-
-      await loadTasks();
-    } catch (error) {
-      setMessage({
-        text:
-          error.response?.data?.detail ||
-          "Failed to schedule visit.",
-        type: "error",
-      });
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleMoveToNextMilestone(task) {
-    const next = NEXT_MILESTONE[task.status];
-
-    if (!next) {
-      setMessage({
-        text: "No next milestone available for this task.",
-        type: "error",
-      });
+    if (currentStatus === "report_uploaded") {
+      setMessage("Survey report already uploaded. Waiting for registrar review.");
       return;
     }
 
+    if (currentStatus === "registrar_reviewed") {
+      setMessage("This survey task has already been reviewed by the registrar.");
+      return;
+    }
+
+    const nextMilestone = NEXT_MILESTONE[currentStatus];
+
+    console.log("Button clicked");
+    console.log("Current status:", currentStatus);
+    console.log("Next milestone:", nextMilestone);
+    console.log("Selected task:", latestSelectedTask);
+
+    if (!nextMilestone) {
+      setMessage(
+        `No next milestone available from status: ${formatStatus(currentStatus)}`
+      );
+      return;
+    }
+
+    if (nextMilestone === "visit_scheduled" && !scheduledDate) {
+      setMessage("Please select scheduled visit date first.");
+      return;
+    }
+
+    const payload = {
+      milestone_type: nextMilestone,
+      by: user?._id || user?.staff_id || staffProfile?._id || "surveyor",
+      meta: {},
+    };
+
+    if (nextMilestone === "visit_scheduled") {
+      payload.meta.scheduled_visit_date = scheduledDate;
+    }
+
+    console.log("Payload sent to backend:", payload);
+
     try {
-      setActionLoading(true);
-      setMessage({ text: "", type: "" });
+      setLoading(true);
+      setMessage("");
 
-      await updateSurveyMilestone(task.application_id, {
-        milestone_type: next,
-        by: user.staff_code || user._id || user.staff_id,
-        meta: {
-          updated_from: "surveyor_page",
-        },
-      });
+      const response = await updateSurveyMilestone(
+        latestSelectedTask.application_id,
+        payload
+      );
 
-      setMessage({
-        text: `Task moved to ${formatStatus(next)}.`,
-        type: "success",
-      });
+      console.log("Backend response:", response.data);
 
-      await loadTasks();
+      const updatedTaskFromBackend =
+        response.data?.survey_task ||
+        response.data?.task ||
+        response.data?.data ||
+        null;
+
+      const updatedTask =
+        updatedTaskFromBackend || {
+          ...latestSelectedTask,
+          status: nextMilestone,
+          scheduled_visit_date:
+            nextMilestone === "visit_scheduled"
+              ? scheduledDate
+              : latestSelectedTask.scheduled_visit_date,
+          milestones: [
+            ...(latestSelectedTask.milestones || []),
+            {
+              type: nextMilestone,
+              at: new Date().toISOString(),
+              by: payload.by,
+              meta: payload.meta,
+            },
+          ],
+        };
+
+      updateTaskLocally(updatedTask);
+
+      setMessage("Survey milestone updated successfully.");
+
+      await loadSurveyorData(user);
     } catch (error) {
-      setMessage({
-        text:
-          error.response?.data?.detail ||
-          "Failed to update survey milestone.",
-        type: "error",
-      });
+      console.log("Milestone error:", error.response?.data || error);
+
+      setMessage(getErrorMessage(error, "Failed to update survey milestone."));
     } finally {
-      setActionLoading(false);
+      setLoading(false);
     }
   }
 
-  async function handleAddFieldNote() {
-    if (!selectedTask) return;
-
+  function handleAddLocalNote() {
     if (!fieldNote.trim()) {
-      setMessage({
-        text: "Please write a field note.",
-        type: "error",
-      });
+      setMessage("Please write a field note first.");
       return;
     }
 
-    try {
-      setActionLoading(true);
-      setMessage({ text: "", type: "" });
+    setLocalNotes((previousNotes) => [...previousNotes, fieldNote.trim()]);
+    setFieldNote("");
 
-      await addFieldNote(selectedTask.application_id, {
-        note: fieldNote,
-      });
+    setMessage(
+      "Field note added locally. It will be sent with the survey report."
+    );
+  }
 
-      setMessage({
-        text: "Field note added successfully.",
-        type: "success",
-      });
+  function handleReportChange(e) {
+    const { name, value } = e.target;
 
-      setFieldNote("");
-      await loadTasks();
-    } catch (error) {
-      setMessage({
-        text:
-          error.response?.data?.detail ||
-          "Failed to add field note.",
-        type: "error",
-      });
-    } finally {
-      setActionLoading(false);
+    setReportData((previousData) => ({
+      ...previousData,
+      [name]: value,
+    }));
+  }
+
+  function handleReportFileChange(e) {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      setReportFile(null);
+      return;
     }
+
+    setReportFile(file);
   }
 
   async function handleUploadReport() {
-    if (!selectedTask) return;
+    if (loading) return;
 
-    if (!reportForm.report_title.trim() || !reportForm.summary.trim()) {
-      setMessage({
-        text: "Report title and summary are required.",
-        type: "error",
-      });
+    if (!selectedTask) {
+      setMessage("Please select a survey task first.");
       return;
     }
 
-    const attachments =
-      reportForm.file_name.trim() && reportForm.file_url.trim()
-        ? [
-            {
-              file_name: reportForm.file_name.trim(),
-              file_url: reportForm.file_url.trim(),
-            },
-          ]
-        : [];
+    if (!selectedTask._id) {
+      setMessage("Survey task Mongo ID is missing.");
+      return;
+    }
+
+    if (!selectedTask.task_id) {
+      setMessage("Survey task ID is missing.");
+      return;
+    }
+
+    if (!selectedTask.application_id) {
+      setMessage("Application ID is missing.");
+      return;
+    }
+
+    if (selectedTask.status !== "survey_completed") {
+      setMessage("Survey report can be uploaded only after survey is completed.");
+      return;
+    }
+
+    if (!reportData.report_title.trim()) {
+      setMessage("Report title is required.");
+      return;
+    }
+
+    if (!reportData.summary.trim()) {
+      setMessage("Report summary is required.");
+      return;
+    }
+
+    if (!reportFile) {
+      setMessage("Please choose a report file.");
+      return;
+    }
+
+    const allowedExtensions = ["pdf", "doc", "docx", "jpg", "jpeg", "png"];
+    const fileExtension = reportFile.name.split(".").pop().toLowerCase();
+
+    if (!allowedExtensions.includes(fileExtension)) {
+      setMessage("Only PDF, Word, JPG, JPEG, and PNG files are allowed.");
+      return;
+    }
+
+    const uploadedBy =
+      user?._id || user?.staff_id || staffProfile?._id || "surveyor";
+
+    if (!uploadedBy) {
+      setMessage("Uploaded by field is missing.");
+      return;
+    }
+
+    const formData = new FormData();
+
+    formData.append("task_id", selectedTask.task_id);
+    formData.append("survey_task_ref", selectedTask._id);
+    formData.append("report_title", reportData.report_title.trim());
+    formData.append("summary", reportData.summary.trim());
+    formData.append("uploaded_by", uploadedBy);
+    formData.append("field_notes", JSON.stringify(localNotes));
+    formData.append("file", reportFile);
 
     try {
-      setActionLoading(true);
-      setMessage({ text: "", type: "" });
+      setLoading(true);
+      setMessage("");
 
-      await uploadSurveyReport(selectedTask.application_id, {
-        report_title: reportForm.report_title,
-        summary: reportForm.summary,
-        attachments,
-        created_by: user.staff_code || user._id || user.staff_id,
-      });
+      const response = await uploadSurveyReport(
+        selectedTask.application_id,
+        formData
+      );
 
-      setMessage({
-        text: "Survey report uploaded successfully.",
-        type: "success",
-      });
+      const updatedTask =
+        response.data?.survey_task || response.data?.task || null;
 
-      setReportForm({
+      if (updatedTask && updatedTask.status) {
+        updateTaskLocally(updatedTask);
+      } else {
+        const localUpdatedTask = {
+          ...selectedTask,
+          status: "report_uploaded",
+          report_uploaded: true,
+        };
+
+        updateTaskLocally(localUpdatedTask);
+      }
+
+      setMessage(
+        "Survey report uploaded successfully. Workflow moved to report_uploaded."
+      );
+
+      setReportData({
         report_title: "",
         summary: "",
-        file_name: "",
-        file_url: "",
       });
 
-      await loadTasks();
+      setReportFile(null);
+      setFieldNote("");
+      setLocalNotes([]);
+
+      await loadSurveyorData(user);
     } catch (error) {
-      setMessage({
-        text:
-          error.response?.data?.detail ||
-          "Failed to upload survey report.",
-        type: "error",
-      });
+      console.log("Upload report error:", error.response?.data || error);
+
+      setMessage(getErrorMessage(error, "Failed to upload survey report."));
     } finally {
-      setActionLoading(false);
+      setLoading(false);
     }
   }
 
@@ -338,383 +470,297 @@ function SurveyorPage() {
     window.location.href = "/login";
   }
 
-  const stats = useMemo(() => {
-    return {
-      total: tasks.length,
-      scheduled: tasks.filter((task) => task.status === "visit_scheduled")
-        .length,
-      completed: tasks.filter(
-        (task) =>
-          task.status === "survey_completed" ||
-          task.status === "report_uploaded" ||
-          task.status === "registrar_reviewed"
-      ).length,
-    };
-  }, [tasks]);
-
-  const selectedProgress = selectedTask
-    ? ((MILESTONE_ORDER.indexOf(selectedTask.status) + 1) /
-        MILESTONE_ORDER.length) *
-      100
-    : 0;
-
-  const role = user.role || user.staff_role;
-
-  if (user.account_type === "staff" && role !== "surveyor") {
-    return (
-      <div className="surveyor-page">
-        <div className="access-card">
-          <h1>Access denied</h1>
-          <p>This page is only for surveyors.</p>
-          <button onClick={logout}>Back to login</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="surveyor-shell">
-      <Navigation user={user} onLogout={logout} />
+    <div className="surveyor-page">
+      <aside className="surveyor-sidebar">
+        <h2>LRMIS</h2>
+        <p>Surveyor Panel</p>
 
-      <main className="surveyor-content-area">
-        <div className="surveyor-page">
-          <section id="overview">
-            <Header
-              title="Surveyor Workspace"
-              subtitle="Manage assigned field survey tasks, milestones, notes, and reports."
-            />
-          </section>
+        <a href="#overview">Overview</a>
+        <a href="#tasks">My Survey Tasks</a>
 
-          {message.text && (
-            <div className={`message-box ${message.type}`}>
-              {message.text}
+        {selectedTask && <a href="#execution">Task Execution</a>}
+
+        <a href="#map">Live Map</a>
+        <a href="#analytics">Analytics</a>
+
+        {canUploadReport(selectedTask) && <a href="#report">Survey Report</a>}
+
+        <button type="button" onClick={logout}>
+          Logout
+        </button>
+      </aside>
+
+      <main className="surveyor-main">
+        <section id="overview" className="page-header">
+          <div>
+            <p className="label">Surveyor Workspace</p>
+            <h1>Field Survey Management</h1>
+            <span>
+              Manage assigned survey tasks, milestones, field notes, and reports.
+            </span>
+          </div>
+        </section>
+
+        {message && <div className="message-box">{message}</div>}
+
+        <section className="stats-grid">
+          <div className="stat-card">
+            <span>Total Tasks</span>
+            <strong>{tasks.length}</strong>
+          </div>
+
+          <div className="stat-card">
+            <span>Active Tasks</span>
+            <strong>{staffProfile?.workload?.active_tasks || 0}</strong>
+          </div>
+
+          <div className="stat-card">
+            <span>Max Tasks</span>
+            <strong>{staffProfile?.workload?.max_tasks || 0}</strong>
+          </div>
+        </section>
+
+        <section id="tasks" className="panel">
+          <h2>My Survey Tasks</h2>
+          <p>
+            This section shows assigned tasks with parcel number, zone, priority,
+            scheduled visit date, and current milestone. Click a task to manage
+            its field workflow.
+          </p>
+
+          {loading && tasks.length === 0 ? (
+            <div className="empty-box">Loading tasks...</div>
+          ) : tasks.length === 0 ? (
+            <div className="empty-box">No assigned survey tasks found.</div>
+          ) : (
+            <div className="task-list">
+              {tasks.map((task) => (
+                <div
+                  className={`task-card ${
+                    getTaskKey(task) === selectedTaskKey ? "selected-task" : ""
+                  }`}
+                  key={getTaskKey(task)}
+                  onClick={() => handleSelectTask(task)}
+                >
+                  <div className="task-card-header">
+                    <div>
+                      <h3>{task.task_id || "Survey Task"}</h3>
+                      <span className="status-badge">
+                        {formatStatus(task.status)}
+                      </span>
+                    </div>
+
+                    <p>Application: {task.application_id}</p>
+                  </div>
+
+                  <div className="task-info">
+                    <span>
+                      Parcel: {task.parcel_number || task.parcel_id || "-"}
+                    </span>
+                    <span>Zone: {task.zone_id || "-"}</span>
+                    <span>Priority: {task.priority || "normal"}</span>
+                    <span>
+                      Visit: {task.scheduled_visit_date || "Not scheduled"}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
+        </section>
 
-          <section className="stats-grid">
-            <div className="stat-card">
-              <span>Total tasks</span>
-              <strong>{stats.total}</strong>
-            </div>
+        {selectedTask && (
+          <section id="execution" className="panel">
+            <h2>Survey Task Execution</h2>
 
-            <div className="stat-card">
-              <span>Scheduled visits</span>
-              <strong>{stats.scheduled}</strong>
-            </div>
-
-            <div className="stat-card">
-              <span>Completed surveys</span>
-              <strong>{stats.completed}</strong>
-            </div>
-          </section>
-
-          <main className="surveyor-layout">
-            <section id="tasks" className="tasks-panel">
-              <div className="panel-title">
+            <div className="execution-box">
+              <div className="execution-header">
                 <div>
-                  <h2>My survey tasks</h2>
-                  <p>Tasks assigned to your surveyor account.</p>
+                  <h3>{selectedTask.task_id}</h3>
+                  <p>Application: {selectedTask.application_id}</p>
                 </div>
 
+                <span className="status-badge">
+                  {formatStatus(selectedTask.status)}
+                </span>
+              </div>
+
+              <div className="task-info">
+                <span>Parcel: {selectedTask.parcel_number || "-"}</span>
+                <span>Zone: {selectedTask.zone_id || "-"}</span>
+                <span>Priority: {selectedTask.priority || "normal"}</span>
+                <span>
+                  Visit: {selectedTask.scheduled_visit_date || "Not scheduled"}
+                </span>
+              </div>
+
+              <div className="milestone-progress">
+                {MILESTONES.map((milestone, index) => (
+                  <div
+                    key={milestone}
+                    className={
+                      index <= getProgressIndex(selectedTask.status)
+                        ? "milestone-step active"
+                        : "milestone-step"
+                    }
+                  >
+                    <span>{index + 1}</span>
+                    <p>{formatStatus(milestone)}</p>
+                  </div>
+                ))}
+              </div>
+
+              {selectedTask.status === "assigned" && (
+                <div className="form-row">
+                  <label>Scheduled Visit Date</label>
+                  <input
+                    type="date"
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {getNextMilestoneLabel(selectedTask.status) ? (
                 <button
-                  className="panel-refresh-btn"
-                  onClick={() => loadTasks()}
+                  type="button"
+                  className="primary-btn"
+                  onClick={handleNextMilestone}
                   disabled={loading}
                 >
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <RefreshIcon />
-                    Refresh
-                  </span>
+                  {loading
+                    ? "Saving..."
+                    : getNextMilestoneLabel(selectedTask.status)}
+                </button>
+              ) : selectedTask.status === "survey_completed" ? (
+                <div className="empty-box success-box">
+                  Survey is completed. The report upload form is now available
+                  below.
+                </div>
+              ) : selectedTask.status === "report_uploaded" ? (
+                <div className="empty-box success-box">
+                  Survey report uploaded successfully. Waiting for registrar
+                  review.
+                </div>
+              ) : selectedTask.status === "registrar_reviewed" ? (
+                <div className="empty-box success-box">
+                  This survey task has been reviewed by the registrar.
+                </div>
+              ) : (
+                <div className="empty-box">
+                  No action available for this status.
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        <section id="map" className="panel">
+          <h2>Live Parcel Map</h2>
+          <div className="map-placeholder">
+            Map will be connected later using OpenStreetMap + Leaflet.
+          </div>
+        </section>
+
+        <section id="analytics" className="panel">
+          <h2>Analytics Dashboard</h2>
+          <div className="analytics-grid">
+            <div>Applications over time</div>
+            <div>Pending applications by zone</div>
+            <div>Average processing time</div>
+            <div>Surveyor workload</div>
+          </div>
+        </section>
+
+        {canUploadReport(selectedTask) && (
+          <section id="report" className="panel">
+            <h2>Survey Report</h2>
+
+            <div className="report-box">
+              <h3>{selectedTask.task_id}</h3>
+
+              <div className="task-info">
+                <span>Task ID: {selectedTask.task_id || "-"}</span>
+                <span>Task Mongo ID: {selectedTask._id || "-"}</span>
+                <span>Application: {selectedTask.application_id || "-"}</span>
+                <span>Status: {formatStatus(selectedTask.status)}</span>
+              </div>
+
+              <div className="form-row full">
+                <label>Field Note</label>
+                <textarea
+                  value={fieldNote}
+                  onChange={(e) => setFieldNote(e.target.value)}
+                  placeholder="Write field notes from the survey visit..."
+                />
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={handleAddLocalNote}
+                >
+                  Add Field Note
                 </button>
               </div>
 
-              {loading ? (
-                <div className="empty-box">Loading tasks…</div>
-              ) : tasks.length === 0 ? (
-                <div className="empty-box">No survey tasks assigned yet.</div>
-              ) : (
-                <div className="task-list">
-                  {tasks.map((task) => (
-                    <article
-                      key={task._id || task.task_id}
-                      className={`task-card ${
-                        selectedTask?._id === task._id ||
-                        selectedTask?.task_id === task.task_id
-                          ? "selected"
-                          : ""
-                      }`}
-                      onClick={() => handleSelectTask(task)}
-                    >
-                      <div className="task-card-top">
-                        <div>
-                          <h3>{task.task_id}</h3>
-                          <p>{task.application_id}</p>
-                        </div>
-
-                        <span className={`status-badge ${task.status}`}>
-                          {formatStatus(task.status)}
-                        </span>
-                      </div>
-
-                      <div className="task-info">
-                        <span>Zone: {task.zone_id || "-"}</span>
-                        <span>Priority: {task.priority || "normal"}</span>
-                        <span>
-                          Visit: {task.scheduled_visit_date || "Not scheduled"}
-                        </span>
-                      </div>
-
-                      <div className="progress">
-                        <div
-                          style={{
-                            width: `${
-                              ((MILESTONE_ORDER.indexOf(task.status) + 1) /
-                                MILESTONE_ORDER.length) *
-                              100
-                            }%`,
-                          }}
-                        />
-                      </div>
-
-                      {NEXT_MILESTONE[task.status] && (
-                        <button
-                          className="task-action-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMoveToNextMilestone(task);
-                          }}
-                          disabled={actionLoading}
-                        >
-                          Move to {formatStatus(NEXT_MILESTONE[task.status])}
-                        </button>
-                      )}
-                    </article>
+              {localNotes.length > 0 && (
+                <div className="notes-box">
+                  <h4>Field Notes</h4>
+                  {localNotes.map((note, index) => (
+                    <p key={index}>• {note}</p>
                   ))}
                 </div>
               )}
-            </section>
 
-            <section id="task-details" className="details-panel">
-              {!selectedTask ? (
-                <div className="empty-details">
-                  <h2>Select a task</h2>
-                  <p>Choose a survey task from the left side to manage it.</p>
+              <div className="report-form">
+                <div className="form-row">
+                  <label>Report Title</label>
+                  <input
+                    type="text"
+                    name="report_title"
+                    value={reportData.report_title}
+                    onChange={handleReportChange}
+                    placeholder="Boundary Survey Report"
+                  />
                 </div>
-              ) : (
-                <>
-                  <div className="panel-title">
-                    <div>
-                      <h2>Task details</h2>
-                      <p>{selectedTask.task_id}</p>
-                    </div>
 
-                    <span className={`status-badge ${selectedTask.status}`}>
-                      {formatStatus(selectedTask.status)}
-                    </span>
-                  </div>
+                <div className="form-row">
+                  <label>Choose Report File</label>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    onChange={handleReportFileChange}
+                  />
 
-                  <div className="details-grid">
-                    <div>
-                      <span>Application ID</span>
-                      <strong>{selectedTask.application_id}</strong>
-                    </div>
-
-                    <div>
-                      <span>Parcel ID</span>
-                      <strong>{selectedTask.parcel_id || "-"}</strong>
-                    </div>
-
-                    <div>
-                      <span>Zone</span>
-                      <strong>{selectedTask.zone_id || "-"}</strong>
-                    </div>
-
-                    <div>
-                      <span>Priority</span>
-                      <strong>{selectedTask.priority || "normal"}</strong>
-                    </div>
-                  </div>
-
-                  <div className="full-progress">
-                    <div style={{ width: `${selectedProgress}%` }} />
-                  </div>
-
-                  <div id="schedule" className="action-section">
-                    <h3>Schedule visit</h3>
-                    <p>This action is allowed only when task status is assigned.</p>
-
-                    <div className="inline-form">
-                      <input
-                        type="date"
-                        value={visitDate}
-                        onChange={(e) => setVisitDate(e.target.value)}
-                        disabled={selectedTask.status !== "assigned"}
-                      />
-
-                      <button
-                        onClick={handleScheduleVisit}
-                        disabled={
-                          actionLoading || selectedTask.status !== "assigned"
-                        }
-                      >
-                        Schedule
-                      </button>
-                    </div>
-                  </div>
-
-                  <div id="milestones" className="action-section">
-                    <h3>Update milestone</h3>
-                    <p>
-                      Current status:{" "}
-                      <strong>{formatStatus(selectedTask.status)}</strong>
+                  {reportFile && (
+                    <p className="hint-text">
+                      Selected file: {reportFile.name}
                     </p>
+                  )}
+                </div>
 
-                    {NEXT_MILESTONE[selectedTask.status] ? (
-                      <button
-                        className="wide-btn"
-                        onClick={() => handleMoveToNextMilestone(selectedTask)}
-                        disabled={actionLoading}
-                      >
-                        Move to{" "}
-                        {formatStatus(NEXT_MILESTONE[selectedTask.status])}
-                      </button>
-                    ) : (
-                      <div className="locked-box">
-                        No milestone update available for this status.
-                      </div>
-                    )}
-                  </div>
+                <div className="form-row full">
+                  <label>Report Summary</label>
+                  <textarea
+                    name="summary"
+                    value={reportData.summary}
+                    onChange={handleReportChange}
+                    placeholder="Write a short summary about the survey result..."
+                  />
+                </div>
+              </div>
 
-                  <div id="notes" className="action-section">
-                    <h3>Field notes</h3>
-
-                    <textarea
-                      rows="4"
-                      placeholder="Write field note…"
-                      value={fieldNote}
-                      onChange={(e) => setFieldNote(e.target.value)}
-                    />
-
-                    <button
-                      className="wide-btn"
-                      onClick={handleAddFieldNote}
-                      disabled={actionLoading}
-                    >
-                      Add field note
-                    </button>
-
-                    {selectedTask.field_notes?.length > 0 && (
-                      <div className="notes-list">
-                        {selectedTask.field_notes.map((note, index) => (
-                          <p key={index}>{note}</p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div id="report" className="action-section">
-                    <h3>Upload survey report</h3>
-                    <p>This action is allowed only after survey_completed.</p>
-
-                    <input
-                      type="text"
-                      placeholder="Report title"
-                      value={reportForm.report_title}
-                      onChange={(e) =>
-                        setReportForm((prev) => ({
-                          ...prev,
-                          report_title: e.target.value,
-                        }))
-                      }
-                      disabled={selectedTask.status !== "survey_completed"}
-                    />
-
-                    <textarea
-                      rows="4"
-                      placeholder="Report summary"
-                      value={reportForm.summary}
-                      onChange={(e) =>
-                        setReportForm((prev) => ({
-                          ...prev,
-                          summary: e.target.value,
-                        }))
-                      }
-                      disabled={selectedTask.status !== "survey_completed"}
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="Attachment file name, example: survey_report.pdf"
-                      value={reportForm.file_name}
-                      onChange={(e) =>
-                        setReportForm((prev) => ({
-                          ...prev,
-                          file_name: e.target.value,
-                        }))
-                      }
-                      disabled={selectedTask.status !== "survey_completed"}
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="Attachment URL, example: /uploads/survey_report.pdf"
-                      value={reportForm.file_url}
-                      onChange={(e) =>
-                        setReportForm((prev) => ({
-                          ...prev,
-                          file_url: e.target.value,
-                        }))
-                      }
-                      disabled={selectedTask.status !== "survey_completed"}
-                    />
-
-                    <button
-                      className="wide-btn"
-                      onClick={handleUploadReport}
-                      disabled={
-                        actionLoading ||
-                        selectedTask.status !== "survey_completed"
-                      }
-                    >
-                      Upload report
-                    </button>
-                  </div>
-
-                  <div id="timeline" className="action-section">
-                    <h3>Milestones timeline</h3>
-
-                    {selectedTask.milestones?.length > 0 ? (
-                      <div className="timeline">
-                        {selectedTask.milestones.map((item, index) => (
-                          <div className="timeline-item" key={index}>
-                            <span className="timeline-dot" />
-                            <div>
-                              <strong>{formatStatus(item.type)}</strong>
-                              <p>By: {item.by || "-"}</p>
-                              <small>
-                                {item.at
-                                  ? new Date(item.at).toLocaleString()
-                                  : ""}
-                              </small>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="locked-box">No milestones yet.</div>
-                    )}
-                  </div>
-                </>
-              )}
-            </section>
-          </main>
-        </div>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={handleUploadReport}
+                disabled={loading}
+              >
+                {loading ? "Uploading..." : "Upload Survey Report"}
+              </button>
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );
