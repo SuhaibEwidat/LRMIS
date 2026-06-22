@@ -1,4 +1,4 @@
-from shapely.geometry import shape, Polygon
+from shapely.geometry import shape
 
 
 def validate_geojson(geometry: dict):

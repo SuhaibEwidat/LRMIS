@@ -19,3 +19,7 @@ class CertificateRepository:
         return collection.find_one({
             "application_id": application_id
         })
+
+    def get_last_certificate(self):
+        return collection.find_one(sort=[("certificate_id", -1)])
+         

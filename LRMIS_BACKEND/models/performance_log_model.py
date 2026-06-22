@@ -26,6 +26,6 @@ def performance_log_model(application_id: str):
             "certificate_issued": False
         },
 
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
     }

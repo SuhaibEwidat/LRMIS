@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import application_router, staff, survey, registrar,auth
+from routers import application_router, staff, survey, registrar, auth, analytics_router
 
 
 app = FastAPI(
@@ -27,6 +27,7 @@ app.include_router(auth.router)
 app.include_router(staff.router)
 app.include_router(survey.router)
 app.include_router(registrar.router)
+app.include_router(analytics_router.router)
 
 
 @app.get("/")
