@@ -54,3 +54,10 @@ def get_processing_time_service():
     return {
         "data": data
     }
+
+def get_surveyor_analytics_service():
+    data = repo.get_surveyor_analytics()
+
+    return {
+        "data": data
+    }

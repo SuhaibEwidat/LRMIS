@@ -5,6 +5,8 @@ from services.Module4.analytics_service import (
     get_applications_by_zone_service,
     get_kpis_service,
     get_processing_time_service,
+    get_surveyor_analytics_service,
+    
 )
 
 router = APIRouter(prefix="/analytics", tags=["Module 4 - Analytics"])
@@ -28,3 +30,7 @@ def get_applications_by_zone():
 @router.get("/processing-time")
 def get_processing_time():
     return get_processing_time_service()
+
+@router.get("/surveyors")
+def get_surveyor_analytics():
+    return get_surveyor_analytics_service()
