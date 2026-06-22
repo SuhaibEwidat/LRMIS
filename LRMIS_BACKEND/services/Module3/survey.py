@@ -1,9 +1,12 @@
 from datetime import datetime
-from email.mime import application
 from fastapi import HTTPException
 
-from repositories import survey_task,survey_report,application_repository,performance_log,staff
-
+from repositories import (
+    survey_task,
+    survey_report,
+    application_repository,
+    performance_log
+)
 
 
 SURVEY_MILESTONE_ORDER = [
@@ -20,7 +23,16 @@ SURVEY_MILESTONE_ORDER = [
 def validate_next_milestone(current_status: str, next_milestone: str):
     """
     Prevent jumping between survey milestones.
+    Example:
+    assigned -> visit_scheduled is allowed
+    assigned -> survey_completed is not allowed
     """
+
+    if current_status not in SURVEY_MILESTONE_ORDER:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid current survey status: {current_status}"
+        )
 
     if next_milestone not in SURVEY_MILESTONE_ORDER:
         raise HTTPException(
@@ -46,6 +58,12 @@ def add_survey_milestone_service(
 ):
     """
     Add survey milestone after validation.
+
+    This is used by:
+    PATCH /applications/{application_id}/survey-milestone
+
+    Supported flow:
+    assigned -> visit_scheduled -> arrived_on_site -> survey_started -> survey_completed
     """
 
     task = survey_task.get_task_by_application_id(application_id)
@@ -60,19 +78,39 @@ def add_survey_milestone_service(
 
     validate_next_milestone(current_status, milestone_type)
 
-    updated_task = survey_task.add_milestone(
-        application_id=application_id,
-        milestone_type=milestone_type,
-        by=by,
-        meta=meta
-    )
+    meta = meta or {}
+
+    # Special case:
+    # When milestone is visit_scheduled, we also need to store scheduled_visit_date
+    if milestone_type == "visit_scheduled":
+        scheduled_visit_date = meta.get("scheduled_visit_date")
+
+        if not scheduled_visit_date:
+            raise HTTPException(
+                status_code=400,
+                detail="scheduled_visit_date is required for visit_scheduled milestone"
+            )
+
+        updated_task = survey_task.set_scheduled_visit(
+            application_id=application_id,
+            scheduled_visit_date=scheduled_visit_date,
+            by=by
+        )
+
+    else:
+        updated_task = survey_task.add_milestone(
+            application_id=application_id,
+            milestone_type=milestone_type,
+            by=by,
+            meta=meta
+        )
 
     performance_log.add_event(
         application_id=application_id,
         event_type=milestone_type,
         actor_type="surveyor",
         actor_id=by,
-        meta=meta or {}
+        meta=meta
     )
 
     return {
@@ -89,6 +127,12 @@ def schedule_visit_service(
     """
     Schedule field visit.
     This moves task from assigned to visit_scheduled.
+
+    This is used by:
+    POST /applications/{application_id}/schedule-visit
+
+    We keep it because it already exists in your router,
+    but the frontend can also use PATCH /survey-milestone.
     """
 
     task = survey_task.get_task_by_application_id(application_id)
@@ -138,9 +182,25 @@ def add_field_note_service(application_id: str, note: str):
             detail="Survey task not found for this application"
         )
 
+    if not note or not note.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Field note cannot be empty"
+        )
+
     updated_task = survey_task.add_field_note(
         application_id=application_id,
-        note=note
+        note=note.strip()
+    )
+
+    performance_log.add_event(
+        application_id=application_id,
+        event_type="field_note_added",
+        actor_type="surveyor",
+        actor_id=str(task.get("assigned_surveyor_id", "surveyor")),
+        meta={
+            "note": note.strip()
+        }
     )
 
     return {
@@ -152,7 +212,15 @@ def add_field_note_service(application_id: str, note: str):
 def upload_survey_report_service(application_id: str, report_data: dict):
     """
     Upload/register survey report metadata.
+
+    This is called after the router saves the real file in uploads folder.
+
     Only allowed after survey_completed.
+    After upload:
+    - create survey report metadata in survey_reports
+    - mark task as report_uploaded
+    - mark application as surveyed
+    - add event to performance_logs
     """
 
     task = survey_task.get_task_by_application_id(application_id)
@@ -169,26 +237,38 @@ def upload_survey_report_service(application_id: str, report_data: dict):
             detail="Survey report can only be uploaded after survey_completed"
         )
 
+    created_by = (
+        report_data.get("created_by")
+        or report_data.get("uploaded_by")
+        or task.get("assigned_surveyor_id")
+        or "surveyor"
+    )
+
     report_data["application_id"] = application_id
     report_data["task_id"] = task.get("task_id")
     report_data["survey_task_ref"] = task.get("_id")
-    report_data.setdefault("created_by", task.get("assigned_surveyor_id"))
+    report_data["created_by"] = str(created_by)
     report_data.setdefault("submitted_at", datetime.utcnow())
+    report_data.setdefault("field_notes", [])
+    report_data.setdefault("attachments", [])
 
     created_report = survey_report.create_survey_report(report_data)
 
     updated_task = survey_task.mark_report_uploaded(application_id)
 
-    updated_application = application_repository.mark_application_surveyed(application_id)
+    updated_application = application_repository.mark_application_surveyed(
+        application_id
+    )
 
     performance_log.add_event(
         application_id=application_id,
         event_type="report_uploaded",
         actor_type="surveyor",
-        actor_id=report_data.get("created_by"),
+        actor_id=str(created_by),
         meta={
             "report_id": created_report.get("_id"),
-            "task_id": task.get("task_id")
+            "task_id": task.get("task_id"),
+            "attachments": report_data.get("attachments", [])
         }
     )
 

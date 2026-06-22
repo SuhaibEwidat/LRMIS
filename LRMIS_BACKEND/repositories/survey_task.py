@@ -53,14 +53,28 @@ def get_task_by_application_id(application_id: str):
 def list_tasks_by_surveyor(surveyor_id: str):
     """
     List all tasks assigned to a specific surveyor.
+    Supports assigned_surveyor_id stored as ObjectId or string.
+    Also supports assigned_surveyor_code if staff_code is used.
     """
+
+    surveyor_object_id = to_object_id(surveyor_id)
+
+    query_conditions = [
+        {"assigned_surveyor_id": surveyor_id},
+        {"assigned_surveyor_code": surveyor_id}
+    ]
+
+    if surveyor_object_id:
+        query_conditions.append({"assigned_surveyor_id": surveyor_object_id})
+
     tasks = list(
         survey_tasks_collection.find(
-            {"assigned_surveyor_id": surveyor_id}
+            {"$or": query_conditions}
         ).sort("created_at", -1)
     )
 
     return serialize_mongo(tasks)
+
 
 
 def list_tasks(status: str = None, zone_id: str = None):

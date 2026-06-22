@@ -2,14 +2,21 @@ from datetime import datetime
 
 from database.database import get_database
 
+
 db = get_database()
 collection = db["land_applications"]
 
 
 def fix_mongo_document(doc):
+    """
+    Convert MongoDB ObjectId to string so FastAPI can return it as JSON.
+    """
     if not doc:
         return doc
-    doc["_id"] = str(doc["_id"])
+
+    if "_id" in doc and isinstance(doc["_id"], ObjectId):
+        doc["_id"] = str(doc["_id"])
+
     return doc
 
 
@@ -56,6 +63,12 @@ class ApplicationRepository:
         new_state: str,
         extra_updates: dict = None,
     ):
+        """
+        Update the application workflow state.
+        """
+
+        now = datetime.utcnow()
+
         update_doc = {
             "workflow.current_state": new_state,
             "timestamps.updated_at": datetime.now(),
