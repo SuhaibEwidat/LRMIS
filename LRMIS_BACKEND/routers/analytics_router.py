@@ -22,3 +22,7 @@ def get_applications_by_status():
 @router.get("/applications-by-zone")
 def get_applications_by_zone():
     return get_applications_by_zone_service()
+
+@router.get("/processing-time")
+def get_processing_time():
+    return get_processing_time_service()

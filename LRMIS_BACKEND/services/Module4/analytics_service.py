@@ -46,3 +46,11 @@ def get_applications_by_zone_service():
             for group in groups
         ],
     }
+
+
+def get_processing_time_service():
+    data = repo.get_processing_time_by_type()
+
+    return {
+        "data": data
+    }
