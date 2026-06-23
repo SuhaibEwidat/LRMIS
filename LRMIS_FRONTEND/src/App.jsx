@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/Auth/LoginPage";
 import RegisterPage from "./pages/Auth/RegisterPage";
 import SurveyorPage from "./pages/Surveyor/SurveyorPage";
+import ApplicantDashboard from "./pages/Applicant/ApplicantDashboard";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/surveyor" element={<SurveyorPage />} />
 
         <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/applicant-dashboard" element={<ApplicantDashboard />} />
       </Routes>
     </BrowserRouter>
   );
