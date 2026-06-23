@@ -3,8 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Auth.css";
 
-const API_URL = "http://127.0.0.1:8000";
-
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 function LoginPage() {
   const navigate = useNavigate();
 
@@ -70,20 +69,19 @@ function LoginPage() {
       }
 
       if (accountType === "staff") {
-        if (role === "surveyor") {
-          navigate("/surveyor");
-          return;
-        }
+  if (role === "surveyor") {
+    navigate("/surveyor-dashboard");
+    return;
+  }
 
-        if (role === "registrar") {
-          navigate("/registrar");
-          return;
-        }
+  if (role === "registrar") {
+    navigate("/registrar-dashboard");
+    return;
+  }
 
-        setMessage("Staff role is missing or not supported.");
-        return;
-      }
-
+  setMessage("Staff role is missing or not supported.");
+  return;
+}
       navigate("/login");
     } catch (error) {
       setMessage(
