@@ -1,12 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from schemas.application_schema import (
     ApplicationCreate,
     AttachmentCreate,
     AttachmentVerification,
     InternalNoteCreate,
-    ObjectionCreate,
-    SurveyReportCreate,
+    
 )
 from services.Module1.application_service import (
     create_application_service,
@@ -40,17 +39,15 @@ def create_application(payload: ApplicationCreate, idempotency_key: str = None):
         data=payload.dict(),
         idempotency_key=idempotency_key,
     )
-    if isinstance(result, dict) and result.get("success") is False:
-        raise HTTPException(status_code=400, detail=result.get("error"))
-    return result
+ 
+    return _handle_service_result(result)
 
 
 @router.get("/{application_id}")
 def get_application(application_id: str):
     result = get_application_service(application_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Application not found")
-    return result
+ 
+    return _handle_service_result(result)
 
 
 @router.get("/")
@@ -94,12 +91,10 @@ def hold_application(application_id: str, reason: str):
     return _handle_service_result(
         hold_application_service(application_id, reason)
     )
-
-
+    
+    
 @router.post("/{application_id}/reject")
-def reject_application(application_id: str, reason: str):
-    if not reason:
-        raise HTTPException(status_code=400, detail="Rejection reason required")
+def reject_application(application_id: str,reason: str = Query(...)):
     return _handle_service_result(
         reject_application_service(application_id, reason)
     )
@@ -108,9 +103,7 @@ def reject_application(application_id: str, reason: str):
 @router.post("/{application_id}/certificate")
 def issue_certificate(application_id: str, registrar_id: str):
     result = issue_certificate_service(application_id, registrar_id)
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error"))
-    return result
+    return _handle_service_result(result)
 
 
 @router.post("/{application_id}/attachments")
@@ -141,6 +134,7 @@ def verify_attachment(
     )
 
 
+
 @router.post("/{application_id}/notes")
 def add_internal_note(application_id: str, payload: InternalNoteCreate):
     return _handle_service_result(
@@ -151,5 +145,7 @@ def add_internal_note(application_id: str, payload: InternalNoteCreate):
             payload.author_role,
         )
     )
+    
+    
 
 

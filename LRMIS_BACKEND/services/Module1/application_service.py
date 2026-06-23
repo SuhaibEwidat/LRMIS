@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from models import application_model
+from models.application_model import application_model
 from models.parcels_model import parcel_model
 from repositories.application_repository import ApplicationRepository
 from repositories.certificate_repository import CertificateRepository
@@ -79,30 +79,10 @@ def create_application_service(data, idempotency_key=None):
     return get_application_service(application_id)
 
 
+
+
 def get_application_service(app_id: str):
-    application = repo.get_application_by_id(app_id)
-    if not application:
-        return None
-
-    certificate = cert_repo.get_application_by_id(app_id)
-    if certificate:
-        certificate["_id"] = str(certificate["_id"])
-        application["certificate"] = {
-            "issued": True,
-            "certificate_id": certificate.get("certificate_id"),
-            "details": certificate,
-        }
-
-    parcel_ref = application.get("parcel_ref") or {}
-    parcel = parcels_repo.find_by_parcel_code(
-        f"{parcel_ref.get('zone_id')}-{parcel_ref.get('block_number')}-{parcel_ref.get('parcel_number')}"
-    )
-    if parcel:
-        parcel["_id"] = str(parcel["_id"])
-        application["parcel_data"] = parcel
-
-    return application
-
+    return repo.get_application_by_id(app_id)
 
 def list_applications_service(
     skip=0,

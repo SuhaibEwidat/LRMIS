@@ -2,6 +2,7 @@ from core.enums import ApplicationStatus
 from services.Module1.geo_validation_engine import validate_geojson
 
 APPLICANT_REQUIRED_FIELDS = ["applicant_id", "applicant_type"]
+
 PARCEL_REQUIRED_FIELDS = [
     "parcel_id",
     "parcel_number",
@@ -74,12 +75,7 @@ def validate_fields_for_transition(
         if current_state != ApplicationStatus.approved.value:
             errors.append("Application must be approved before certificate issuance")
 
-    if new_state == ApplicationStatus.rejected.value:
-        rejection_reason = pending_updates.get("workflow.rejection_reason") or workflow.get(
-            "rejection_reason"
-        )
-        if not rejection_reason:
-            errors.append("Rejection reason is required")
+   
 
     objection = application.get("objection", {})
     if objection.get("has_objection") and new_state != ApplicationStatus.under_objection.value:

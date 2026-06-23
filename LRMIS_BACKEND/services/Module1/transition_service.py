@@ -12,9 +12,8 @@ repo = ApplicationRepository()
 # CORE ENGINE
 # -------------------------
 
-def transition_application_service(application: dict, new_state: str, extra_updates: dict = None):
-
-    application_id = application["application_id"]
+def transition_application_service(application_id: str, new_state: str, extra_updates: dict = None):
+    application = repo.get_application_by_id(application_id)
     current_state = application["workflow"]["current_state"]
 
     # 1. validate transition rules
@@ -62,13 +61,13 @@ def transition_application_service(application: dict, new_state: str, extra_upda
 
 
 #reject application
-def reject_application_service(application: dict, reason: str):
+def reject_application_service(application_id: str, reason: str):
 
     if not reason:
         return {"success": False, "error": "Rejection reason is required"}
 
     return transition_application_service(
-        application,
+        application_id,
         ApplicationStatus.rejected.value,
         extra_updates={
             "workflow.rejection_reason": reason,
@@ -77,13 +76,13 @@ def reject_application_service(application: dict, reason: str):
     )
 
 # hold application
-def hold_application_service(application: dict, reason: str):
+def hold_application_service(application_id: str, reason: str):
 
     if not reason:
         return {"success": False, "error": "Hold reason is required"}
 
     return transition_application_service(
-        application,
+        application_id,
         ApplicationStatus.on_hold.value,
         extra_updates={
             "workflow.hold_reason": reason,
@@ -92,13 +91,13 @@ def hold_application_service(application: dict, reason: str):
     )
 
 # missing documents
-def mark_missing_documents_service(application: dict, missing_docs: list):
+def mark_missing_documents_service(application_id: str, missing_docs: list):
 
     if not missing_docs:
         return {"success": False, "error": "Missing documents required"}
 
     return transition_application_service(
-        application,
+        application_id,
         ApplicationStatus.missing_documents.value,
         extra_updates={
             "workflow.missing_documents": missing_docs,

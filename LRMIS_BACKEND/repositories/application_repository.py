@@ -1,5 +1,5 @@
 from datetime import datetime
-
+from bson import ObjectId
 from database.database import get_database
 
 
@@ -9,7 +9,7 @@ collection = db["land_applications"]
 
 def fix_mongo_document(doc):
     """
-    Convert MongoDB ObjectId to string so FastAPI can return it as JSON.
+    Convert MongoDB ObjectId to string 
     """
     if not doc:
         return doc

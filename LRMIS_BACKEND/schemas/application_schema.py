@@ -44,13 +44,5 @@ class InternalNoteCreate(BaseModel):
     author_role: str = "registrar"
 
 
-class SurveyReportCreate(BaseModel):
-    report_id: str
-    submitted_by: str
-    summary: Optional[str] = None
 
 
-class ObjectionCreate(BaseModel):
-    objection_id: str
-    reason: str
-    filed_by: str
