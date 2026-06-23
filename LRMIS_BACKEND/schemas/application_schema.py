@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
-
+from pydantic import BaseModel
+from typing import Literal
 
 class ApplicantRef(BaseModel):
     applicant_id: str
@@ -42,7 +43,6 @@ class InternalNoteCreate(BaseModel):
     note: str
     author_id: str
     author_role: str = "registrar"
-
-
+    visibility: Literal["staff_only", "applicant", "public"] = "staff_only"
 
 

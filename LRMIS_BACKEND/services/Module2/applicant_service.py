@@ -224,7 +224,7 @@ def submit_objection_service(application_id: str, objection_data: dict):
     submitted_by = objection_data.get("submitted_by")
     reason = objection_data.get("reason")
     description = objection_data.get("description")
-
+    supporting_documents = objection_data.get("supporting_documents", [])
     if not submitted_by:
         raise HTTPException(
             status_code=400,
@@ -238,7 +238,7 @@ def submit_objection_service(application_id: str, objection_data: dict):
         )
 
     
-
+    objection_data["supporting_documents"] = supporting_documents
     objection_data["application_id"] = application_id
     objection_data["submitted_by_type"] = "applicant"
     objection_data["status"] = "submitted"
@@ -271,13 +271,14 @@ def submit_objection_service(application_id: str, objection_data: dict):
     )
 
     return {
-        "message": "Objection submitted successfully",
-        "objection_id": objection_id,
-        "application_id": application_id,
-        "status": objection_data["status"],
-        "application_updated": application_updated > 0,
-        "logs_updated": logs_updated > 0
-    }
+    "message": "Objection submitted successfully",
+    "objection_id": objection_id,
+    "application_id": application_id,
+    "status": objection_data["status"],
+    "supporting_documents": objection_data["supporting_documents"],
+    "application_updated": application_updated > 0,
+    "logs_updated": logs_updated > 0
+}
 
 def get_application_timeline_service(application_id: str):
     application = applicant_repository.find_application_by_application_id(application_id)
@@ -307,4 +308,21 @@ def get_application_timeline_service(application_id: str):
         "computed_kpis": timeline_log.get("computed_kpis", {}),
         "created_at": timeline_log.get("created_at"),
         "updated_at": timeline_log.get("updated_at")
+    }
+def get_application_documents_service(application_id: str):
+    application = applicant_repository.find_application_by_application_id(
+        application_id
+    )
+
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    documents = applicant_repository.find_documents_by_application_id(
+        application_id
+    )
+
+    return {
+        "application_id": application_id,
+        "count": len(documents),
+        "data": documents
     }
