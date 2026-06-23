@@ -1,0 +1,340 @@
+* {
+  box-sizing: border-box;
+}
+
+.registrar-page {
+  min-height: 100vh;
+  display: flex;
+  background: #f3f6f8;
+  color: #102033;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+.registrar-sidebar {
+  width: 280px;
+  min-height: 100vh;
+  position: fixed;
+  inset: 0 auto 0 0;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 20px;
+  background: linear-gradient(180deg, #102033 0%, #17283a 100%);
+  color: #ffffff;
+  box-shadow: 12px 0 30px rgba(15, 23, 42, 0.16);
+}
+
+.registrar-brand h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.registrar-brand p {
+  margin: 8px 0 34px;
+  color: #9fe1cb;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.registrar-nav {
+  display: grid;
+  gap: 10px;
+}
+
+.registrar-nav button {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #cbd5e1;
+  text-align: left;
+  padding: 14px 15px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.registrar-nav button:hover {
+  background: rgba(159, 225, 203, 0.12);
+  color: #ffffff;
+  border-color: rgba(159, 225, 203, 0.22);
+  transform: translateX(4px);
+}
+
+.registrar-nav button.active {
+  background: linear-gradient(135deg, #2a7f6f, #1f5f54);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 22px rgba(42, 127, 111, 0.28);
+}
+
+.registrar-logout-btn {
+  margin-top: auto;
+  border: 1px solid rgba(212, 83, 126, 0.45);
+  background: rgba(212, 83, 126, 0.14);
+  color: #f3a1a6;
+  padding: 14px 15px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.registrar-logout-btn:hover {
+  background: #d4537e;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.registrar-main {
+  margin-left: 280px;
+  width: calc(100% - 280px);
+  padding: 34px;
+}
+
+.registrar-header {
+  background: linear-gradient(135deg, #102033, #284858);
+  color: #ffffff;
+  border-radius: 24px;
+  padding: 36px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+  position: relative;
+  overflow: hidden;
+}
+
+.registrar-header::after {
+  content: "";
+  position: absolute;
+  width: 230px;
+  height: 230px;
+  right: -90px;
+  top: -100px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.registrar-header .label {
+  margin: 0 0 12px;
+  color: #9fe1cb;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.registrar-header h1 {
+  margin: 0 0 12px;
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.registrar-header span {
+  display: block;
+  max-width: 760px;
+  color: #d7e6f5;
+  line-height: 1.7;
+  font-size: 15px;
+}
+
+.registrar-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.registrar-stat-card {
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+.registrar-stat-card span {
+  display: block;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.registrar-stat-card strong {
+  display: block;
+  color: #102033;
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.registrar-panel {
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 22px;
+  padding: 28px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+.registrar-panel h2 {
+  margin: 0 0 8px;
+  color: #102033;
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.registrar-panel p {
+  margin: 0 0 22px;
+  color: #64748b;
+  line-height: 1.7;
+  font-size: 15px;
+}
+
+.placeholder-box {
+  border: 1px dashed #94a3b8;
+  background: #f8fafc;
+  color: #475569;
+  border-radius: 18px;
+  padding: 34px;
+  text-align: center;
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .registrar-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .registrar-page {
+    display: block;
+  }
+
+  .registrar-sidebar {
+    position: relative;
+    width: 100%;
+    min-height: auto;
+  }
+
+  .registrar-main {
+    margin-left: 0;
+    width: 100%;
+    padding: 20px;
+  }
+
+  .registrar-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .registrar-header,
+  .registrar-panel {
+    padding: 22px;
+    border-radius: 18px;
+  }
+
+  .registrar-header h1 {
+    font-size: 28px;
+  }
+}
+
+.registrar-message {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+  padding: 14px 16px;
+  border-radius: 14px;
+  font-weight: 800;
+  margin-bottom: 18px;
+}
+
+.registrar-applications-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.registrar-application-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #d9e2ec;
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.registrar-application-row strong {
+  display: block;
+  color: #102033;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.registrar-application-row span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.registrar-status-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #065f46 !important;
+  border: 1px solid #a7f3d0;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  text-transform: capitalize;
+}
+.registrar-main {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.registrar-header {
+  max-width: 100%;
+  margin-bottom: 20px;
+}
+
+.registrar-stats-grid {
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  align-items: stretch;
+}
+
+.registrar-stat-card {
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.registrar-stat-card span {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.registrar-stat-card strong {
+  font-size: 30px;
+  line-height: 1;
+}
+
+@media (max-width: 1200px) {
+  .registrar-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .registrar-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

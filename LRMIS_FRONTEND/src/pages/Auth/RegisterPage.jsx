@@ -3,15 +3,23 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Auth.css";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+function splitCommaValues(value) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 function RegisterPage() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
+    account_type: "applicant",
+
     email: "",
     password: "",
-    account_type: "applicant",
 
     full_name: "",
     applicant_type: "citizen",
@@ -23,33 +31,51 @@ function RegisterPage() {
     street: "",
     zone_id: "",
     preferred_language: "ar",
-    notify_email: true,
-    notify_sms: false,
-    show_contact_to_staff: true,
   });
+
+  const [staffForm, setStaffForm] = useState({
+  staff_code: "",
+  name: "",
+  role: "registrar",
+  department: "",
+  skills: "",
+  zone_ids: "",
+  phone: "",
+  max_tasks: "",
+});
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
   const [showPassword, setShowPassword] = useState(false);
 
   function handleChange(e) {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
 
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: value,
     }));
   }
 
-  function validateForm() {
-    if (!formData.email.trim()) {
-      return "Email is required.";
-    }
+  function handleStaffChange(e) {
+    const { name, value } = e.target;
 
-    if (!formData.password.trim()) {
-      return "Password is required.";
-    }
+    setStaffForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
 
+  function handleAccountTypeChange(accountType) {
+    setFormData((prev) => ({
+      ...prev,
+      account_type: accountType,
+    }));
+
+    setMessage({ text: "", type: "" });
+  }
+
+  function validateApplicantForm() {
     if (!formData.full_name.trim()) {
       return "Full name is required.";
     }
@@ -66,9 +92,11 @@ function RegisterPage() {
       return "Zone ID is required.";
     }
 
-    const needsNationalId = ["citizen", "surveyor", "authorized_representative"].includes(
-      formData.applicant_type
-    );
+    const needsNationalId = [
+      "citizen",
+      "surveyor",
+      "authorized_representative",
+    ].includes(formData.applicant_type);
 
     const needsRegistrationNumber = ["company", "lawyer"].includes(
       formData.applicant_type
@@ -85,7 +113,55 @@ function RegisterPage() {
     return "";
   }
 
-  function buildRequestBody() {
+  function validateStaffForm() {
+    if (!staffForm.staff_code.trim()) {
+      return "Staff code is required.";
+    }
+
+    if (!staffForm.name.trim()) {
+      return "Staff name is required.";
+    }
+
+    if (!staffForm.role.trim()) {
+      return "Staff role is required.";
+    }
+
+    if (!staffForm.department.trim()) {
+      return "Department is required.";
+    }
+
+    if (!staffForm.phone.trim()) {
+      return "Staff phone is required.";
+    }
+
+    if (!staffForm.zone_ids.trim()) {
+      return "At least one zone ID is required.";
+    }
+
+    if (!staffForm.max_tasks || Number(staffForm.max_tasks) <= 0) {
+      return "Max tasks must be greater than 0.";
+    }
+
+    return "";
+  }
+
+  function validateForm() {
+    if (!formData.email.trim()) {
+      return "Email is required.";
+    }
+
+    if (!formData.password.trim()) {
+      return "Password is required.";
+    }
+
+    if (formData.account_type === "staff") {
+      return validateStaffForm();
+    }
+
+    return validateApplicantForm();
+  }
+
+  function buildApplicantRequestBody() {
     return {
       email: formData.email.trim(),
       password: formData.password,
@@ -112,10 +188,10 @@ function RegisterPage() {
 
       preferences: {
         language: formData.preferred_language,
-        preferred_contact: formData.notify_email ? "email" : "sms",
+        preferred_contact: "email",
         notifications: {
-          email: formData.notify_email,
-          sms: formData.notify_sms,
+          email: true,
+          sms: false,
           on_status_change: true,
           on_missing_documents: true,
           on_certificate_ready: true,
@@ -123,9 +199,47 @@ function RegisterPage() {
       },
 
       privacy_settings: {
-        show_contact_to_staff: formData.show_contact_to_staff,
+        show_contact_to_staff: true,
       },
     };
+  }
+
+  function buildStaffRequestBody() {
+    return {
+      email: formData.email.trim(),
+      password: formData.password,
+      account_type: "staff",
+
+      staff_code: staffForm.staff_code.trim(),
+      name: staffForm.name.trim(),
+      role: staffForm.role,
+      department: staffForm.department.trim(),
+
+      skills: splitCommaValues(staffForm.skills),
+
+      coverage: {
+        zone_ids: splitCommaValues(staffForm.zone_ids),
+      },
+
+      workload: {
+        active_tasks: 0,
+        max_tasks: Number(staffForm.max_tasks),
+      },
+
+      contacts: {
+        phone: staffForm.phone.trim(),
+      },
+
+      active: true,
+    };
+  }
+
+  function buildRequestBody() {
+    if (formData.account_type === "staff") {
+      return buildStaffRequestBody();
+    }
+
+    return buildApplicantRequestBody();
   }
 
   async function handleSubmit(e) {
@@ -145,7 +259,10 @@ function RegisterPage() {
       await axios.post(`${API_URL}/auth/register`, buildRequestBody());
 
       setMessage({
-        text: "Applicant account created successfully — redirecting to login…",
+        text:
+          formData.account_type === "staff"
+            ? "Staff account created successfully — redirecting to login…"
+            : "Applicant account created successfully — redirecting to login…",
         type: "success",
       });
 
@@ -191,15 +308,14 @@ function RegisterPage() {
 
           <div className="panel-body">
             <h1>
-              Applicant
+              Account
               <br />
               <em>Registration</em>
             </h1>
 
             <p>
-              Create an applicant account to submit land registration requests,
-              upload supporting documents, track application status, and submit
-              objections when needed.
+              Create an applicant or staff account to access LRMIS services,
+              manage land registration requests, and track application workflow.
             </p>
           </div>
 
@@ -207,37 +323,61 @@ function RegisterPage() {
             <div className="reg-step">
               <div className="reg-step-num">1</div>
               <div>
-                <strong>Login credentials</strong>
-                <span>Email &amp; password</span>
+                <strong>Choose account</strong>
+                <span>Applicant or staff member</span>
               </div>
             </div>
 
             <div className="reg-step">
               <div className="reg-step-num">2</div>
               <div>
-                <strong>Applicant profile</strong>
-                <span>Identity, contact &amp; address</span>
+                <strong>Login credentials</strong>
+                <span>Email &amp; password</span>
               </div>
             </div>
 
             <div className="reg-step">
               <div className="reg-step-num">3</div>
               <div>
-                <strong>Preferences</strong>
-                <span>Notifications &amp; privacy</span>
+                <strong>Profile details</strong>
+                <span>Identity, role &amp; contact info</span>
               </div>
             </div>
           </div>
         </div>
 
         <div className="reg-form-side">
-          <p className="auth-kicker">NEW APPLICANT ACCOUNT</p>
+          <p className="auth-kicker">NEW LRMIS ACCOUNT</p>
 
-          <h2 className="reg-title">Applicant registration</h2>
+          <h2 className="reg-title">
+            {formData.account_type === "staff"
+              ? "Staff registration"
+              : "Applicant registration"}
+          </h2>
 
           <p className="auth-subtitle">
-            Fill in the required information to create your applicant profile
+            Choose the account type and fill in the required information
           </p>
+
+          <div className="account-type-switch">
+            <button
+              type="button"
+              className={
+                formData.account_type === "applicant" ? "active" : ""
+              }
+              onClick={() => handleAccountTypeChange("applicant")}
+            >
+              Applicant
+            </button>
+
+            <button
+              type="button"
+              className={formData.account_type === "staff" ? "active" : ""}
+              onClick={() => handleAccountTypeChange("staff")}
+            >
+              Staff member
+            </button>
+          </div>
 
           {message.text && (
             <div className={`auth-message ${message.type}`}>
@@ -314,237 +454,282 @@ function RegisterPage() {
                     onClick={() => setShowPassword((v) => !v)}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? (
-                      <svg
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        aria-hidden="true"
-                      >
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                        <line x1="1" y1="1" x2="23" y2="23" />
-                      </svg>
-                    ) : (
-                      <svg
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        aria-hidden="true"
-                      >
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                    )}
+                    {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="reg-section-label">
-              <span className="reg-section-num">2</span>
-              Applicant profile
-            </div>
+            {formData.account_type === "applicant" && (
+              <>
+                <div className="reg-section-label">
+                  <span className="reg-section-num">2</span>
+                  Applicant profile
+                </div>
 
-            <div className="form-grid">
-              <div className="input-group">
-                <label htmlFor="full_name">Full name</label>
-                <input
-                  id="full_name"
-                  type="text"
-                  name="full_name"
-                  placeholder="Enter full name"
-                  value={formData.full_name}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+                <div className="form-grid">
+                  <div className="input-group">
+                    <label htmlFor="full_name">Full name</label>
+                    <input
+                      id="full_name"
+                      type="text"
+                      name="full_name"
+                      placeholder="Enter full name"
+                      value={formData.full_name}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
 
-              <div className="input-group">
-                <label htmlFor="applicant_type">Applicant type</label>
-                <select
-                  id="applicant_type"
-                  name="applicant_type"
-                  value={formData.applicant_type}
-                  onChange={handleChange}
-                >
-                  <option value="citizen">Citizen</option>
-                  <option value="lawyer">Lawyer</option>
-                  <option value="company">Company</option>
-                  <option value="surveyor">Surveyor</option>
-                  <option value="authorized_representative">
-                    Authorized Representative
-                  </option>
-                </select>
-              </div>
+                  <div className="input-group">
+                    <label htmlFor="applicant_type">Applicant type</label>
+                    <select
+                      id="applicant_type"
+                      name="applicant_type"
+                      value={formData.applicant_type}
+                      onChange={handleChange}
+                    >
+                      <option value="citizen">Citizen</option>
+                      <option value="lawyer">Lawyer</option>
+                      <option value="company">Company</option>
+                      <option value="surveyor">Surveyor</option>
+                      <option value="authorized_representative">
+                        Authorized Representative
+                      </option>
+                    </select>
+                  </div>
 
-              <div className="input-group">
-                <label htmlFor="national_id">
-                  National ID
-                  {!isCompanyOrLawyer && (
-                    <span className="field-hint">Required</span>
-                  )}
-                </label>
+                  <div className="input-group">
+                    <label htmlFor="national_id">
+                      National ID
+                      {!isCompanyOrLawyer && (
+                        <span className="field-hint">Required</span>
+                      )}
+                    </label>
 
-                <input
-                  id="national_id"
-                  type="text"
-                  name="national_id"
-                  placeholder="National ID number"
-                  value={formData.national_id}
-                  onChange={handleChange}
-                />
-              </div>
+                    <input
+                      id="national_id"
+                      type="text"
+                      name="national_id"
+                      placeholder="National ID number"
+                      value={formData.national_id}
+                      onChange={handleChange}
+                    />
+                  </div>
 
-              <div className="input-group">
-                <label htmlFor="registration_number">
-                  Registration number
-                  {isCompanyOrLawyer && (
-                    <span className="field-hint">Required</span>
-                  )}
-                </label>
+                  <div className="input-group">
+                    <label htmlFor="registration_number">
+                      Registration number
+                      {isCompanyOrLawyer && (
+                        <span className="field-hint">Required</span>
+                      )}
+                    </label>
 
-                <input
-                  id="registration_number"
-                  type="text"
-                  name="registration_number"
-                  placeholder="Company / lawyer registration number"
-                  value={formData.registration_number}
-                  onChange={handleChange}
-                />
-              </div>
+                    <input
+                      id="registration_number"
+                      type="text"
+                      name="registration_number"
+                      placeholder="Company / lawyer registration number"
+                      value={formData.registration_number}
+                      onChange={handleChange}
+                    />
+                  </div>
 
-              <div className="input-group">
-                <label htmlFor="phone">Phone</label>
-                <input
-                  id="phone"
-                  type="text"
-                  name="phone"
-                  placeholder="+970 5X XXX XXXX"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+                  <div className="input-group">
+                    <label htmlFor="phone">Phone</label>
+                    <input
+                      id="phone"
+                      type="text"
+                      name="phone"
+                      placeholder="+970 5X XXX XXXX"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
 
-              <div className="input-group">
-                <label htmlFor="preferred_language">Preferred language</label>
-                <select
-                  id="preferred_language"
-                  name="preferred_language"
-                  value={formData.preferred_language}
-                  onChange={handleChange}
-                >
-                  <option value="ar">Arabic</option>
-                  <option value="en">English</option>
-                </select>
-              </div>
+                  <div className="input-group">
+                    <label htmlFor="preferred_language">
+                      Preferred language
+                    </label>
+                    <select
+                      id="preferred_language"
+                      name="preferred_language"
+                      value={formData.preferred_language}
+                      onChange={handleChange}
+                    >
+                      <option value="ar">Arabic</option>
+                      <option value="en">English</option>
+                    </select>
+                  </div>
 
-              <div className="input-group">
-                <label htmlFor="city">City</label>
-                <input
-                  id="city"
-                  type="text"
-                  name="city"
-                  placeholder="Ramallah"
-                  value={formData.city}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+                  <div className="input-group">
+                    <label htmlFor="city">City</label>
+                    <input
+                      id="city"
+                      type="text"
+                      name="city"
+                      placeholder="Ramallah"
+                      value={formData.city}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
 
-              <div className="input-group">
-                <label htmlFor="neighborhood">Neighborhood</label>
-                <input
-                  id="neighborhood"
-                  type="text"
-                  name="neighborhood"
-                  placeholder="Al Tireh"
-                  value={formData.neighborhood}
-                  onChange={handleChange}
-                />
-              </div>
+                  <div className="input-group">
+                    <label htmlFor="neighborhood">Neighborhood</label>
+                    <input
+                      id="neighborhood"
+                      type="text"
+                      name="neighborhood"
+                      placeholder="Al Tireh"
+                      value={formData.neighborhood}
+                      onChange={handleChange}
+                    />
+                  </div>
 
-              <div className="input-group">
-                <label htmlFor="street">Street</label>
-                <input
-                  id="street"
-                  type="text"
-                  name="street"
-                  placeholder="Street name"
-                  value={formData.street}
-                  onChange={handleChange}
-                />
-              </div>
+                  <div className="input-group">
+                    <label htmlFor="street">Street</label>
+                    <input
+                      id="street"
+                      type="text"
+                      name="street"
+                      placeholder="Street name"
+                      value={formData.street}
+                      onChange={handleChange}
+                    />
+                  </div>
 
-              <div className="input-group">
-                <label htmlFor="zone_id">Zone ID</label>
-                <input
-                  id="zone_id"
-                  type="text"
-                  name="zone_id"
-                  placeholder="ZONE-RM-01"
-                  value={formData.zone_id}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
+                  <div className="input-group">
+                    <label htmlFor="zone_id">Zone ID</label>
+                    <input
+                      id="zone_id"
+                      type="text"
+                      name="zone_id"
+                      placeholder="ZONE-RM-01"
+                      value={formData.zone_id}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
-            <div className="reg-section-label">
-              <span className="reg-section-num">3</span>
-              Notifications &amp; privacy
-            </div>
+            {formData.account_type === "staff" && (
+              <>
+                <div className="reg-section-label">
+                  <span className="reg-section-num">2</span>
+                  Staff profile
+                </div>
 
-            <div className="checkbox-group">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="notify_email"
-                  checked={formData.notify_email}
-                  onChange={handleChange}
-                />
-                <span className="checkbox-custom" />
-                <span>
-                  Email notifications
-                  <em>Receive application updates to your inbox</em>
-                </span>
-              </label>
+                <div className="form-grid">
+                  <div className="input-group">
+                    <label htmlFor="staff_code">Staff Code</label>
+                    <input
+                      id="staff_code"
+                      type="text"
+                      name="staff_code"
+                      placeholder="REG-RM-02"
+                      value={staffForm.staff_code}
+                      onChange={handleStaffChange}
+                      required
+                    />
+                  </div>
 
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="notify_sms"
-                  checked={formData.notify_sms}
-                  onChange={handleChange}
-                />
-                <span className="checkbox-custom" />
-                <span>
-                  SMS notifications
-                  <em>Receive text message alerts</em>
-                </span>
-              </label>
+                  <div className="input-group">
+                    <label htmlFor="name">Name</label>
+                    <input
+                      id="name"
+                      type="text"
+                      name="name"
+                      placeholder="Registrar Officer 2"
+                      value={staffForm.name}
+                      onChange={handleStaffChange}
+                      required
+                    />
+                  </div>
 
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="show_contact_to_staff"
-                  checked={formData.show_contact_to_staff}
-                  onChange={handleChange}
-                />
-                <span className="checkbox-custom" />
-                <span>
-                  Show contact to staff
-                  <em>Staff can view your phone number when processing requests</em>
-                </span>
-              </label>
-            </div>
+                  <div className="input-group">
+                    <label htmlFor="role">Role</label>
+                    <select
+                      id="role"
+                      name="role"
+                      value={staffForm.role}
+                      onChange={handleStaffChange}
+                    >
+                      <option value="registrar">Registrar</option>
+                      <option value="surveyor">Surveyor</option>
+                    </select>
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="department">Department</label>
+                   <input
+  id="department"
+  type="text"
+  name="department"
+  placeholder="Land Registration Department"
+  value={staffForm.department}
+  onChange={handleStaffChange}
+  required
+/>
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="skills">Skills</label>
+                    <input
+  id="skills"
+  type="text"
+  name="skills"
+  placeholder="legal_review, document_verification"
+  value={staffForm.skills}
+  onChange={handleStaffChange}
+/>
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="zone_ids">Zone IDs</label>
+                   <input
+  id="zone_ids"
+  type="text"
+  name="zone_ids"
+  placeholder="ZONE-RM-01, ZONE-RM-02"
+  value={staffForm.zone_ids}
+  onChange={handleStaffChange}
+  required
+/>
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="staff_phone">Phone</label>
+                  <input
+  id="staff_phone"
+  type="text"
+  name="phone"
+  placeholder="+970599222222"
+  value={staffForm.phone}
+  onChange={handleStaffChange}
+  required
+/>
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="max_tasks">Max Tasks</label>
+                    <input
+  id="max_tasks"
+  type="number"
+  name="max_tasks"
+  min="1"
+  placeholder="10"
+  value={staffForm.max_tasks}
+  onChange={handleStaffChange}
+  required
+/>
+                  </div>
+                </div>
+              </>
+            )}
 
             <button type="submit" className="auth-button" disabled={loading}>
               {loading ? (
@@ -552,6 +737,8 @@ function RegisterPage() {
                   <span className="spinner" aria-hidden="true" />
                   Creating account…
                 </>
+              ) : formData.account_type === "staff" ? (
+                "Create staff account"
               ) : (
                 "Create applicant account"
               )}
