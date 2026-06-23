@@ -15,7 +15,7 @@
   top: 18px;
   z-index: 20;
   overflow: hidden;
-  font-family: 'Times New Roman', serif;
+  font-family: 'Inter', sans-serif;
 }
 
 /* Topographic background, matches auth pages */
