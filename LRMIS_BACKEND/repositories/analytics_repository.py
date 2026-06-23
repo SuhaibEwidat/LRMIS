@@ -5,13 +5,11 @@ collection = db["land_applications"]
 staff_collection = db["staff_members"]
 survey_tasks_collection = db["survey_tasks"]
 
-
 TERMINAL_STATES = [
     "approved",
     "certificate_issued",
     "closed",
     "rejected",
-    "under_objection",
 ]
 
 
@@ -95,7 +93,6 @@ class AnalyticsRepository:
 
         return list(self.collection.aggregate(pipeline))
 
-    # calculate
     def get_processing_time_by_type(self):
         pipeline = [
             {"$match": {"timestamps.submitted_at": {"$ne": None}}},
@@ -133,7 +130,6 @@ class AnalyticsRepository:
                     "processing_days": {
                         "$divide": [
                             {
-                                # end_at - submitted_at =result(in miliseconds)so we divide it on 86400000
                                 "$subtract": ["$end_at", "$submitted_at"]
                             },
                             86400000,
@@ -164,31 +160,23 @@ class AnalyticsRepository:
         return list(self.collection.aggregate(pipeline))
 
     def get_surveyor_analytics(self):
-        # we will give mongodb many step or series
-        pipleline = [
+        pipeline = [
             {"$match": {"role": "surveyor"}},
             {
-                # connect connection with other connection
                 "$lookup": {
-                    # go to collection
                     "from": "survey_tasks",
-                    # take id frrom survey inside staff_members
                     "localField": "_id",
-                    # search inside survey tasks about tasks which assigned_surveyor_id=_id
-                    # connection like this staff_members._id = survey_tasks.assigned_surveyor_id
                     "foreignField": "assigned_surveyor_id",
-                    # Place the tasks you found inside an array named tasks.
                     "as": "tasks",
                 }
             },
-            # Choose the final result format, or create new fields.
-            # This means that instead of returning all employee data, we only return the data we need for the dashboard.
             {
                 "$project": {
                     "_id": 0,
                     "surveyor_id": {"$toString": "$_id"},
                     "surveyor_code": "$staff_code",
                     "surveyor_name": "$name",
+                    "active": "$active",
                     "active_tasks": "$workload.active_tasks",
                     "max_tasks": "$workload.max_tasks",
                     "total_tasks": {"$size": "$tasks"},
@@ -204,9 +192,9 @@ class AnalyticsRepository:
                                             "survey_completed",
                                             "report_uploaded",
                                             "registrar_reviewed",
-                                        ]
+                                        ],
                                     ]
-                                }
+                                },
                             }
                         }
                     },
@@ -215,10 +203,10 @@ class AnalyticsRepository:
                             "$filter": {
                                 "input": "$tasks",
                                 "as": "task",
-                                "cond": {"$eq": ["$$task.report_uploaded", True]}
+                                "cond": {"$eq": ["$$task.report_uploaded", True]},
                             }
                         }
-                    }
+                    },
                 }
             },
             {
@@ -241,13 +229,18 @@ class AnalyticsRepository:
                                 "$round": [
                                     {
                                         "$multiply": [
-                                            {"$divide": ["$completed_tasks", "$total_tasks"]},
-                                            100
+                                            {
+                                                "$divide": [
+                                                    "$completed_tasks",
+                                                    "$total_tasks",
+                                                ]
+                                            },
+                                            100,
                                         ]
                                     },
-                                    2
+                                    2,
                                 ]
-                            }
+                            },
                         ]
                     },
                     "workload_percentage": {
@@ -258,25 +251,26 @@ class AnalyticsRepository:
                                 "$round": [
                                     {
                                         "$multiply": [
-                                            {"$divide": ["$active_tasks", "$max_tasks"]},
-                                            100
+                                            {
+                                                "$divide": [
+                                                    "$active_tasks",
+                                                    "$max_tasks",
+                                                ]
+                                            },
+                                            100,
                                         ]
                                     },
-                                    2
+                                    2,
                                 ]
-                            }
+                            },
                         ]
-                    }
+                    },
                 }
             },
-            {
-                "$sort": {"workload_percentage": -1}
-            }
+            {"$sort": {"workload_percentage": -1}},
         ]
-        # Currently, the function will return surveyor data only.
-        # we use self.staff_collection because we need to analytic from staff_members
-        return list(self.staff_collection.aggregate(pipleline))
-    
+
+        return list(self.staff_collection.aggregate(pipeline))
 
     def get_registrar_workload(self):
         pipeline = [
@@ -420,3 +414,107 @@ class AnalyticsRepository:
         ]
 
         return list(self.staff_collection.aggregate(pipeline))
+
+    def get_parcels_with_geometry(self):
+        """
+        Get parcel map data directly from land_applications.
+
+        We are not using a separate parcels collection here.
+        The parcel boundary comes from:
+        land_applications.parcel_geometry
+        """
+        applications = self.collection.find(
+            {
+                "parcel_geometry": {
+                    "$exists": True,
+                    "$nin": [None, {}],
+                }
+            }
+        )
+
+        parcels = []
+        seen_keys = set()
+
+        for app in applications:
+            parcel_ref = app.get("parcel_ref", {})
+            geometry = app.get("parcel_geometry")
+
+            if not geometry:
+                continue
+
+            parcel_key = (
+                parcel_ref.get("parcel_id"),
+                parcel_ref.get("parcel_number"),
+                parcel_ref.get("zone_id"),
+            )
+
+            if parcel_key in seen_keys:
+                continue
+
+            seen_keys.add(parcel_key)
+
+            parcels.append(
+                {
+                    "_id": parcel_ref.get("parcel_id") or str(app.get("_id")),
+                    "parcel_code": parcel_ref.get("parcel_id"),
+                    "parcel_number": parcel_ref.get("parcel_number"),
+                    "block_number": parcel_ref.get("block_number"),
+                    "basin_number": parcel_ref.get("basin_number"),
+                    "zone_id": parcel_ref.get("zone_id"),
+                    "area_sqm": None,
+                    "land_use": None,
+                    "registration_status": None,
+                    "geometry": geometry,
+                    "address_hint": None,
+                    "dispute_state": None,
+                }
+            )
+
+        return parcels
+
+    def get_pending_applications_with_parcels(self):
+        """
+        Get pending applications directly from land_applications.
+
+        We are not using a separate parcels collection here.
+        The parcel boundary comes from:
+        land_applications.parcel_geometry
+        """
+        query = {
+            "workflow.current_state": {
+                "$nin": TERMINAL_STATES
+            },
+            "parcel_geometry": {
+                "$exists": True,
+                "$nin": [None, {}],
+            },
+        }
+
+        applications = list(self.collection.find(query))
+        result = []
+
+        for app in applications:
+            parcel_ref = app.get("parcel_ref", {})
+            geometry = app.get("parcel_geometry")
+
+            if not geometry:
+                continue
+
+            parcel = {
+                "_id": parcel_ref.get("parcel_id") or str(app.get("_id")),
+                "parcel_code": parcel_ref.get("parcel_id"),
+                "parcel_number": parcel_ref.get("parcel_number"),
+                "block_number": parcel_ref.get("block_number"),
+                "basin_number": parcel_ref.get("basin_number"),
+                "zone_id": parcel_ref.get("zone_id"),
+                "geometry": geometry,
+            }
+
+            result.append(
+                {
+                    "application": app,
+                    "parcel": parcel,
+                }
+            )
+
+        return result
