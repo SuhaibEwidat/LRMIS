@@ -4,6 +4,7 @@ import LoginPage from "./pages/Auth/LoginPage";
 import RegisterPage from "./pages/Auth/RegisterPage";
 import SurveyorPage from "./pages/Surveyor/SurveyorPage";
 import ApplicantDashboard from "./pages/Applicant/ApplicantDashboard";
+import RegistrarDashboard from "./pages/Registrar/RegistrarDashboard";
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="/surveyor" element={<SurveyorPage />} />
 
         <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/registrar-dashboard" element={<RegistrarDashboard />} />
         <Route path="/applicant-dashboard" element={<ApplicantDashboard />} />
       </Routes>
     </BrowserRouter>

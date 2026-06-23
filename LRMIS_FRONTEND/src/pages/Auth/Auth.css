@@ -745,3 +745,36 @@ body {
     grid-column: unset;
   }
 }
+
+.account-type-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #dbe4ee;
+  padding: 8px;
+  border-radius: 16px;
+  margin: 18px 0 22px;
+}
+
+.account-type-switch button {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.account-type-switch button:hover {
+  background: rgba(42, 127, 111, 0.08);
+  color: #2a7f6f;
+}
+
+.account-type-switch button.active {
+  background: #2a7f6f;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(42, 127, 111, 0.22);
+}
