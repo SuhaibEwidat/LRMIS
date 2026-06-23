@@ -28,6 +28,8 @@ router = APIRouter(prefix="/applications", tags=["Module 1 - Applications"])
 
 
 def _handle_service_result(result: dict):
+    if result is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
     if result.get("success") is False:
         raise HTTPException(status_code=400, detail=result.get("error"))
     return result.get("data", result)
@@ -143,9 +145,9 @@ def add_internal_note(application_id: str, payload: InternalNoteCreate):
             payload.note,
             payload.author_id,
             payload.author_role,
+            payload.visibility,
         )
     )
-    
     
 
 

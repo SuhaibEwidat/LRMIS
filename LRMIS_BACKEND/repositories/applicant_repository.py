@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from bson import ObjectId
 
 from database.database import get_database
@@ -112,20 +114,24 @@ def insert_objection(objection_data:dict):
     return str(result.inserted_id)
 
 # Link the created objection to the related application
-def add_objection_to_application(application_id:str,objection_id:str):
-    result=applications_collection.update_one(
+def add_objection_to_application(application_id: str, objection_id: str):
+    now = datetime.now(timezone.utc)
+
+    result = applications_collection.update_one(
+        {"application_id": application_id},
         {
-            "application_id":application_id
-        },
-        {
-            "$set":{
-                "objection.has_objection":True
+            "$set": {
+                "objection.has_objection": True,
+                "workflow.current_state": "under_objection",
+                "status": "under_objection",
+                "timestamps.updated_at": now
             },
-            "$push":{
-                "objection.objection_ids":objection_id
+            "$addToSet": {
+                "objection.objection_ids": objection_id
             }
         }
     )
+
     return result.modified_count
 
 # Add objection submission as an event inside performance logs.eventstream 
@@ -163,3 +169,15 @@ def findTimeLineByApplicationId(application_id:str):
         }
 
     )
+def find_documents_by_application_id(application_id: str):
+    documents = list(
+        documents_collection
+        .find({"application_id": application_id})
+        .sort("uploaded_at", -1)
+    )
+
+    for document in documents:
+        document["document_id"] = str(document["_id"])
+        del document["_id"]
+
+    return documents

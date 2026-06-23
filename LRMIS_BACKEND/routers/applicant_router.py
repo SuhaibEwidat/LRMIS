@@ -6,6 +6,11 @@ from pydantic import BaseModel, Field
 
 from services.Module2 import applicant_service
 
+import os
+import uuid
+from pathlib import Path
+from fastapi import UploadFile, File, Form, HTTPException
+from datetime import datetime, timezone
 
 router = APIRouter(
     tags=["Module 2 - Applicant Portal"]
@@ -109,20 +114,109 @@ def get_applicant_applications(applicant_id: str):
     return applicant_service.get_applicant_applications_service(applicant_id)
 
 @router.post("/applications/{application_id}/documents")
-def add_application_doucment(application_id:str,request:DocumentCreateRequest):
-    data=model_to_dict(request)
-    return applicant_service.add_application_document_service(application_id,data)
+async def add_application_doucment(
+    application_id: str,
+    document_type: str = Form(...),
+    uploaded_by: str = Form(...),
+    notes: str = Form(""),
+    file: UploadFile = File(...)
+):
+    allowed_extensions = {"pdf", "doc", "docx", "jpg", "jpeg", "png"}
 
+    original_file_name = Path(file.filename).name
+    file_extension = original_file_name.split(".")[-1].lower()
+
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF, Word, JPG, JPEG, and PNG files are allowed"
+        )
+
+    upload_dir = "uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    safe_file_name = f"{application_id}_{uuid.uuid4().hex}_{original_file_name}"
+    file_path = os.path.join(upload_dir, safe_file_name)
+
+    file_content = await file.read()
+
+    with open(file_path, "wb") as saved_file:
+        saved_file.write(file_content)
+
+    document_data = {
+        "document_type": document_type,
+        "file_name": original_file_name,
+        "file_url": f"/uploads/{safe_file_name}",
+        "uploaded_by": uploaded_by,
+        "notes": notes or "Uploaded by applicant",
+    }
+
+    return applicant_service.add_application_document_service(
+        application_id,
+        document_data
+    )
 @router.post("/applications/{application_id}/comments")
 def add_application_comment(application_id:str,request:CommentRequest):
     data=model_to_dict(request)
     return applicant_service.add_application_comment_service(application_id,data)
 
 @router.post("/applications/{application_id}/objections")
-def add_objection(application_id:str,request:ObjectionRequest):
-    data=model_to_dict(request)
-    return applicant_service.submit_objection_service(application_id,data)
+async def add_objection(
+    application_id: str,
+    submitted_by: str = Form(...),
+    reason: str = Form(...),
+    description: str = Form(""),
+    file: Optional[UploadFile] = File(None),
+):
+    supporting_documents = []
+
+    if file:
+        allowed_extensions = {"pdf", "doc", "docx", "jpg", "jpeg", "png"}
+
+        original_file_name = Path(file.filename).name
+        file_extension = original_file_name.split(".")[-1].lower()
+
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail="Only PDF, Word, JPG, JPEG, and PNG files are allowed"
+            )
+
+        upload_dir = "uploads"
+        os.makedirs(upload_dir, exist_ok=True)
+
+        safe_file_name = (
+            f"{application_id}_objection_{uuid.uuid4().hex}_{original_file_name}"
+        )
+
+        file_path = os.path.join(upload_dir, safe_file_name)
+
+        file_content = await file.read()
+
+        with open(file_path, "wb") as saved_file:
+            saved_file.write(file_content)
+
+        supporting_documents.append(
+            {
+                "file_name": original_file_name,
+                "file_url": f"/uploads/{safe_file_name}",
+                "uploaded_at": datetime.now(timezone.utc),
+            }
+        )
+
+    data = {
+        "submitted_by": submitted_by,
+        "reason": reason,
+        "description": description,
+        "supporting_documents": supporting_documents,
+    }
+
+    return applicant_service.submit_objection_service(application_id, data)
 
 @router.get("/applications/{application_id}/timeline")
 def get_application_timeline(application_id: str):
     return applicant_service.get_application_timeline_service(application_id)
+
+@router.get("/applications/{application_id}/documents")
+def get_application_documents(application_id: str):
+    return applicant_service.get_application_documents_service(application_id)

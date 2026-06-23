@@ -35,7 +35,59 @@ def _store_parcel_for_application(data: dict):
         "current_owner_refs": parcel_ref.get("owner_refs", []),
         "geometry": geometry,
     }
+
     create_parcel_service(parcel_data)
+
+
+REQUIRED_DOCUMENTS_BY_APPLICATION_TYPE = {
+    "first_registration": [
+        {"document_type": "id_copy", "label": "ID Copy"},
+        {"document_type": "ownership_deed", "label": "Ownership Deed"},
+        {"document_type": "parcel_map", "label": "Parcel Map"},
+    ],
+    "ownership_transfer": [
+        {"document_type": "id_copy", "label": "ID Copy"},
+        {"document_type": "ownership_deed", "label": "Ownership Deed"},
+        {"document_type": "sale_contract", "label": "Sale Contract"},
+    ],
+    "parcel_subdivision": [
+        {"document_type": "id_copy", "label": "ID Copy"},
+        {"document_type": "ownership_deed", "label": "Ownership Deed"},
+        {"document_type": "parcel_map", "label": "Parcel Map"},
+    ],
+    "parcel_merge": [
+        {"document_type": "id_copy", "label": "ID Copy"},
+        {"document_type": "ownership_deed", "label": "Ownership Deed"},
+        {"document_type": "parcel_map", "label": "Parcel Map"},
+    ],
+    "boundary_correction": [
+        {"document_type": "id_copy", "label": "ID Copy"},
+        {"document_type": "ownership_deed", "label": "Ownership Deed"},
+        {"document_type": "parcel_map", "label": "Parcel Map"},
+    ],
+    "certificate_request": [
+        {"document_type": "id_copy", "label": "ID Copy"},
+        {"document_type": "ownership_deed", "label": "Ownership Deed"},
+    ],
+}
+
+
+def build_required_documents(application_type: str) -> list:
+    documents = REQUIRED_DOCUMENTS_BY_APPLICATION_TYPE.get(application_type, [])
+
+    return [
+        {
+            "document_type": document["document_type"],
+            "label": document["label"],
+            "required": True,
+            "status": "missing",
+            "uploaded_document_id": None,
+            "file_name": None,
+            "reviewed_by": None,
+            "review_note": None,
+        }
+        for document in documents
+    ]
 
 
 def create_application_service(data, idempotency_key=None):
@@ -47,11 +99,13 @@ def create_application_service(data, idempotency_key=None):
 
     if data.get("parcel_geometry"):
         geo_result = validate_geojson(data["parcel_geometry"])
+
         if not geo_result["valid"]:
             return {"success": False, "error": geo_result["errors"]}
 
     last = repo.get_last_application()
     last_number = 1
+
     if last and "application_id" in last:
         try:
             last_number = int(last["application_id"].split("-")[-1]) + 1
@@ -62,6 +116,16 @@ def create_application_service(data, idempotency_key=None):
 
     new_app = application_model(data)
     new_app["application_id"] = application_id
+
+    application_type = (
+        new_app.get("application_type")
+        or data.get("application_type")
+        or (data.get("tags") or [None])[0]
+    )
+
+    new_app["application_type"] = application_type
+    new_app["required_documents"] = build_required_documents(application_type)
+
     if idempotency_key:
         new_app["idempotency_key"] = idempotency_key
 
@@ -79,10 +143,14 @@ def create_application_service(data, idempotency_key=None):
     return get_application_service(application_id)
 
 
-
-
 def get_application_service(app_id: str):
-    return repo.get_application_by_id(app_id)
+    app = repo.get_application_by_id(app_id)
+
+    if not app:
+        return {"success": False, "error": f"Application {app_id} not found"}
+
+    return app
+
 
 def list_applications_service(
     skip=0,
