@@ -46,3 +46,25 @@ def get_applications_by_zone_service():
             for group in groups
         ],
     }
+
+
+def get_processing_time_service():
+    data = repo.get_processing_time_by_type()
+
+    return {
+        "data": data
+    }
+
+def get_surveyor_analytics_service():
+    data = repo.get_surveyor_analytics()
+
+    return {
+        "data": data
+    }
+
+def get_registrar_workload_service():
+    data = repo.get_registrar_workload()
+
+    return {
+        "data": data
+    }
