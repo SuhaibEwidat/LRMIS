@@ -276,3 +276,147 @@ class AnalyticsRepository:
         # Currently, the function will return surveyor data only.
         # we use self.staff_collection because we need to analytic from staff_members
         return list(self.staff_collection.aggregate(pipleline))
+    
+
+    def get_registrar_workload(self):
+        pipeline = [
+            {
+                "$match": {
+                    "role": "registrar"
+                }
+            },
+            {
+                "$lookup": {
+                    "from": "land_applications",
+                    "let": {
+                        "registrar_id_obj": "$_id",
+                        "registrar_id_str": {"$toString": "$_id"},
+                        "registrar_code": "$staff_code"
+                    },
+                    "pipeline": [
+                        {
+                            "$match": {
+                                "$expr": {
+                                    "$or": [
+                                        {
+                                            "$eq": [
+                                                "$assignment.assigned_registrar_id",
+                                                "$$registrar_id_obj"
+                                            ]
+                                        },
+                                        {
+                                            "$eq": [
+                                                "$assignment.assigned_registrar_id",
+                                                "$$registrar_id_str"
+                                            ]
+                                        },
+                                        {
+                                            "$eq": [
+                                                "$assignment.assigned_registrar_id",
+                                                "$$registrar_code"
+                                            ]
+                                        },
+                                        {
+                                            "$eq": [
+                                                "$assignment.assigned_registrar_code",
+                                                "$$registrar_code"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    "as": "applications"
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "registrar_id": {"$toString": "$_id"},
+                    "registrar_code": "$staff_code",
+                    "registrar_name": "$name",
+                    "active": "$active",
+
+                    "active_tasks": {
+                        "$ifNull": ["$workload.active_tasks", 0]
+                    },
+                    "max_tasks": {
+                        "$ifNull": ["$workload.max_tasks", 0]
+                    },
+
+                    "pending_reviews": {
+                        "$size": {
+                            "$filter": {
+                                "input": "$applications",
+                                "as": "app",
+                                "cond": {
+                                    "$in": [
+                                        "$$app.workflow.current_state",
+                                        ["legal_review", "surveyed"]
+                                    ]
+                                }
+                            }
+                        }
+                    },
+
+                    "completed_reviews": {
+                        "$size": {
+                            "$filter": {
+                                "input": "$applications",
+                                "as": "app",
+                                "cond": {
+                                    "$in": [
+                                        "$$app.workflow.current_state",
+                                        [
+                                            "approved",
+                                            "rejected",
+                                            "on_hold",
+                                            "certificate_issued",
+                                            "closed"
+                                        ]
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "registrar_id": 1,
+                    "registrar_code": 1,
+                    "registrar_name": 1,
+                    "active": 1,
+                    "active_tasks": 1,
+                    "max_tasks": 1,
+                    "pending_reviews": 1,
+                    "completed_reviews": 1,
+
+                    "workload_percentage": {
+                        "$cond": [
+                            {"$eq": ["$max_tasks", 0]},
+                            0,
+                            {
+                                "$round": [
+                                    {
+                                        "$multiply": [
+                                            {
+                                                "$divide": [
+                                                    "$active_tasks",
+                                                    "$max_tasks"
+                                                ]
+                                            },
+                                            100
+                                        ]
+                                    },
+                                    2
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
+
+        return list(self.staff_collection.aggregate(pipeline))

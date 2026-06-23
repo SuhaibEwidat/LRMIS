@@ -61,3 +61,10 @@ def get_surveyor_analytics_service():
     return {
         "data": data
     }
+
+def get_registrar_workload_service():
+    data = repo.get_registrar_workload()
+
+    return {
+        "data": data
+    }

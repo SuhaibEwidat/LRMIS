@@ -6,6 +6,7 @@ from services.Module4.analytics_service import (
     get_kpis_service,
     get_processing_time_service,
     get_surveyor_analytics_service,
+    get_registrar_workload_service,
     
 )
 
@@ -34,3 +35,7 @@ def get_processing_time():
 @router.get("/surveyors")
 def get_surveyor_analytics():
     return get_surveyor_analytics_service()
+
+@router.get("/registrars")
+def get_registrar_workload():
+    return get_registrar_workload_service()
