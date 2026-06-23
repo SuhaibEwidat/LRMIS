@@ -97,6 +97,9 @@ def register_applicant(data: dict, email: str, password_hash: str):
     privacy_settings = data.get("privacy_settings", {})
 
     national_id = identity.get("national_id")
+    phone = contacts.get("phone")
+    city = address.get("city")
+    zone_id = address.get("zone_id")
 
     if not full_name:
         raise HTTPException(status_code=400, detail="full_name is required")
@@ -116,16 +119,35 @@ def register_applicant(data: dict, email: str, password_hash: str):
             detail="Invalid applicant_type"
         )
 
-    if not national_id:
-        raise HTTPException(status_code=400, detail="national_id is required")
+    # Validate required contact and address fields
+    if not phone:
+        raise HTTPException(status_code=400, detail="Phone number is required")
+    
+    if not city:
+        raise HTTPException(status_code=400, detail="City is required")
+    
+    if not zone_id:
+        raise HTTPException(status_code=400, detail="Zone ID is required")
 
-    existing_national_id = auth.get_applicant_by_national_id(national_id)
+    # National ID is required only for certain applicant types
+    registration_number = identity.get("registration_number")
+    
+    needs_national_id = applicant_type in ["citizen", "surveyor", "authorized_representative"]
+    needs_registration_number = applicant_type in ["company", "lawyer"]
+    
+    if needs_national_id and not national_id:
+        raise HTTPException(status_code=400, detail="National ID is required for this applicant type")
+    
+    if needs_registration_number and not registration_number:
+        raise HTTPException(status_code=400, detail="Registration number is required for this applicant type")
 
-    if existing_national_id:
-        raise HTTPException(
-            status_code=409,
-            detail="National ID already exists"
-        )
+    if national_id:
+        existing_national_id = auth.get_applicant_by_national_id(national_id)
+        if existing_national_id:
+            raise HTTPException(
+                status_code=409,
+                detail="National ID already exists"
+            )
 
     applicant_data = {
         "user_id": None,
