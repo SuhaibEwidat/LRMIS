@@ -729,33 +729,33 @@ const [objectionForm, setObjectionForm] = useState({
   }
 
   async function handleCreateApplication(e) {
-    e.preventDefault();
-    setSubmitMessage({ text: "", type: "" });
+  e.preventDefault();
+  setSubmitMessage({ text: "", type: "" });
 
-    const applicantId = getApplicantId(user);
+  const applicantId = getApplicantId(user);
 
-    if (!applicantId) {
-      setSubmitMessage({
-        text: "Applicant ID not found. Please login again.",
-        type: "error",
-      });
-      return;
-    }
+  if (!applicantId) {
+    setSubmitMessage({
+      text: "Applicant ID not found. Please login again.",
+      type: "error",
+    });
+    return;
+  }
 
-    if (!applicationForm.parcel_number.trim()) {
-      setSubmitMessage({ text: "Parcel number is required.", type: "error" });
-      return;
-    }
+  if (!applicationForm.parcel_number.trim()) {
+    setSubmitMessage({ text: "Parcel number is required.", type: "error" });
+    return;
+  }
 
-    if (!applicationForm.block_number.trim()) {
-      setSubmitMessage({ text: "Block number is required.", type: "error" });
-      return;
-    }
+  if (!applicationForm.block_number.trim()) {
+    setSubmitMessage({ text: "Block number is required.", type: "error" });
+    return;
+  }
 
-    if (!applicationForm.basin_number.trim()) {
-      setSubmitMessage({ text: "Basin number is required.", type: "error" });
-      return;
-    }
+  if (!applicationForm.basin_number.trim()) {
+    setSubmitMessage({ text: "Basin number is required.", type: "error" });
+    return;
+  }
 
     if (!applicationForm.zone_id.trim()) {
       setSubmitMessage({ text: "Zone ID is required.", type: "error" });
@@ -780,48 +780,48 @@ const [objectionForm, setObjectionForm] = useState({
       return;
     }
 
-    const payload = {
-      application_type: applicationForm.application_type,
-      priority: applicationForm.priority,
+  const payload = {
+    application_type: applicationForm.application_type,
+    priority: applicationForm.priority,
 
-      applicant_ref: {
-        applicant_id: applicantId,
-        applicant_type:
-          profile?.applicant_type || user?.applicant_type || "citizen",
-        submitted_by_representative: false,
-      },
+    applicant_ref: {
+      applicant_id: applicantId,
+      applicant_type:
+        profile?.applicant_type || user?.applicant_type || "citizen",
+      submitted_by_representative: false,
+    },
 
-      parcel_ref: {
-        parcel_id: "",
-        parcel_number: applicationForm.parcel_number.trim(),
-        block_number: applicationForm.block_number.trim(),
-        basin_number: applicationForm.basin_number.trim(),
-        zone_id: applicationForm.zone_id.trim(),
-        owner_refs: [],
-      },
+    parcel_ref: {
+      parcel_id: generatedParcelId,
+      parcel_number: parcelNumber,
+      block_number: blockNumber,
+      basin_number: basinNumber,
+      zone_id: zoneId,
+      owner_refs: [applicantId],
+    },
 
       parcel_geometry: parcelGeometry,
 
-      description:
-        applicationForm.description.trim() ||
-        `${applicationForm.application_type} application for parcel ${applicationForm.parcel_number}.`,
+    description:
+      applicationForm.description.trim() ||
+      `${applicationForm.application_type} application for parcel ${parcelNumber}.`,
 
-      tags: [applicationForm.application_type],
-    };
+    tags: [applicationForm.application_type],
+  };
 
-    const idempotencyKey = `${applicantId}-${Date.now()}`;
+  const idempotencyKey = `${applicantId}-${Date.now()}`;
 
-    try {
-      setLoading(true);
-      setMessage("");
+  try {
+    setLoading(true);
+    setMessage("");
 
-      const response = await createApplication(payload, idempotencyKey);
+    const response = await createApplication(payload, idempotencyKey);
 
-      const createdApplication =
-        response.data?.data ||
-        response.data?.application ||
-        response.data ||
-        {};
+    const createdApplication =
+      response.data?.data ||
+      response.data?.application ||
+      response.data ||
+      {};
 
       const createdApplicationId =
         createdApplication.application_id ||
@@ -878,10 +878,10 @@ const [objectionForm, setObjectionForm] = useState({
       });
       setApplicationDocumentFiles({});
 
-      await loadApplicantData(user);
+    await loadApplicantData(user);
 
-      setLastSubmittedApplication(confirmationApplication);
-      setActiveSection("confirmation");
+    setLastSubmittedApplication(confirmationApplication);
+    setActiveSection("confirmation");
 
       setSubmitMessage({
         text: `Application submitted successfully.${
@@ -894,16 +894,16 @@ const [objectionForm, setObjectionForm] = useState({
     } catch (error) {
       console.log("Create application error:", error.response?.data || error);
 
-      setSubmitMessage({
-        text:
-          error.response?.data?.detail ||
-          "Failed to submit application. Please check your data.",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
+    setSubmitMessage({
+      text:
+        error.response?.data?.detail ||
+        "Failed to submit application. Please check your data.",
+      type: "error",
+    });
+  } finally {
+    setLoading(false);
   }
+}
 
   function handleDocumentChange(e) {
     const { name, value } = e.target;

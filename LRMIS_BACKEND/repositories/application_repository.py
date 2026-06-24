@@ -4,7 +4,9 @@ from database.database import get_database
 
 
 db = get_database()
+
 collection = db["land_applications"]
+application_documents_collection = db["application_documents"]
 
 
 def fix_mongo_document(doc):
@@ -15,38 +17,49 @@ def fix_mongo_document(doc):
     if not doc:
         return doc
 
-    if "_id" in doc and isinstance(doc["_id"], ObjectId):
-        doc["_id"] = str(doc["_id"])
+    if isinstance(doc, list):
+        return [fix_mongo_document(item) for item in doc]
+
+    if isinstance(doc, dict):
+        fixed_doc = {}
+
+        for key, value in doc.items():
+            if isinstance(value, ObjectId):
+                fixed_doc[key] = str(value)
+            elif isinstance(value, dict):
+                fixed_doc[key] = fix_mongo_document(value)
+            elif isinstance(value, list):
+                fixed_doc[key] = fix_mongo_document(value)
+            else:
+                fixed_doc[key] = value
+
+        return fixed_doc
 
     return doc
 
 
 class ApplicationRepository:
-
-    def __init__(self, collection=collection):
+    def __init__(
+        self,
+        collection=collection,
+        documents_collection=application_documents_collection,
+    ):
         self.collection = collection
+        self.documents_collection = documents_collection
 
     def find_by_idempotency_key(self, idempotency_key: str):
-        return self.collection.find_one({
-            "idempotency_key": idempotency_key
-        })
+        return self.collection.find_one({"idempotency_key": idempotency_key})
 
     def create_application(self, application: dict):
         result = self.collection.insert_one(application)
         return str(result.inserted_id)
 
     def get_application_by_id(self, app_id: str):
-        result = self.collection.find_one({
-            "application_id": app_id
-        })
-
+        result = self.collection.find_one({"application_id": app_id})
         return fix_mongo_document(result)
 
     def get_last_application(self):
-        result = self.collection.find_one(
-            sort=[("application_id", -1)]
-        )
-
+        result = self.collection.find_one(sort=[("application_id", -1)])
         return fix_mongo_document(result)
 
     def list_applications(
@@ -62,15 +75,12 @@ class ApplicationRepository:
         result = self.collection.find(query).skip(skip).limit(limit)
 
         if sort_by:
-            result = result.sort([
-                (sort_by, -1 if order == "desc" else 1)
-            ])
+            result = result.sort([(sort_by, -1 if order == "desc" else 1)])
 
         return [fix_mongo_document(doc) for doc in result]
 
     def count_applications(self, query: dict = None):
         query = query or {}
-
         return self.collection.count_documents(query)
 
     def update_workflow_state(
@@ -79,62 +89,34 @@ class ApplicationRepository:
         new_state: str,
         extra_updates: dict = None,
     ):
-        """
-        Update the application workflow state and main status.
-        """
-
-        now = datetime.now()
-
         update_doc = {
             "workflow.current_state": new_state,
             "status": new_state,
-            "timestamps.updated_at": now,
+            "timestamps.updated_at": datetime.utcnow(),
         }
 
         if extra_updates:
             update_doc.update(extra_updates)
 
-        self.collection.update_one(
-            {
-                "application_id": application_id
-            },
-            {
-                "$set": update_doc
-            },
+        return self.collection.update_one(
+            {"application_id": application_id},
+            {"$set": update_doc},
         )
 
     def set_fields(self, application_id: str, fields: dict):
-        """
-        Update specific fields in the application.
-        """
+        fields["timestamps.updated_at"] = datetime.utcnow()
 
-        fields["timestamps.updated_at"] = datetime.now()
-
-        self.collection.update_one(
-            {
-                "application_id": application_id
-            },
-            {
-                "$set": fields
-            },
+        return self.collection.update_one(
+            {"application_id": application_id},
+            {"$set": fields},
         )
 
     def push_attachment(self, application_id: str, attachment: dict):
-        """
-        Add attachment metadata to the application.
-        """
-
         return self.collection.update_one(
+            {"application_id": application_id},
             {
-                "application_id": application_id
-            },
-            {
-                "$push": {
-                    "attachments": attachment
-                },
-                "$set": {
-                    "timestamps.updated_at": datetime.now()
-                },
+                "$push": {"attachments": attachment},
+                "$set": {"timestamps.updated_at": datetime.utcnow()},
             },
         )
 
@@ -142,42 +124,90 @@ class ApplicationRepository:
         self,
         application_id: str,
         document_type: str,
-        status: str
+        status: str,
     ):
-        """
-        Update attachment verification status.
-        """
-
-        return self.collection.update_one(
-            {
-                "application_id": application_id,
-                "attachments.document_type": document_type,
-            },
-            {
-                "$set": {
-                    "attachments.$.verification_status": status,
-                    "attachments.$.verified_at": datetime.now(),
-                    "timestamps.updated_at": datetime.now(),
-                }
-            },
+        return self.update_attachment_verification(
+            application_id=application_id,
+            document_type=document_type,
+            verification_status=status,
+            verified_by=None,
+            review_note=None,
         )
 
-    def push_internal_note(self, application_id: str, note: dict):
-        """
-        Add internal staff note to the application.
-        """
+    def update_attachment_verification(
+        self,
+        application_id: str,
+        document_type: str,
+        verification_status: str,
+        verified_by: str = None,
+        review_note: str = None,
+    ):
+        now = datetime.utcnow()
 
-        return self.collection.update_one(
+        attachment_updates = {
+            "attachments.$[attachment].verification_status": verification_status,
+            "attachments.$[attachment].verified_at": now,
+            "timestamps.updated_at": now,
+        }
+
+        required_document_updates = {
+            "required_documents.$[document].status": verification_status,
+            "required_documents.$[document].reviewed_by": verified_by,
+            "required_documents.$[document].reviewed_at": now,
+            "timestamps.updated_at": now,
+        }
+
+        document_collection_updates = {
+            "verification_status": verification_status,
+            "status": verification_status,
+            "verified_at": now,
+            "updated_at": now,
+        }
+
+        if verified_by:
+            attachment_updates["attachments.$[attachment].verified_by"] = verified_by
+            document_collection_updates["verified_by"] = verified_by
+
+        if review_note is not None:
+            attachment_updates["attachments.$[attachment].review_note"] = review_note
+            required_document_updates["required_documents.$[document].review_note"] = review_note
+            document_collection_updates["review_note"] = review_note
+
+        attachment_result = self.collection.update_one(
+            {"application_id": application_id},
+            {"$set": attachment_updates},
+            array_filters=[{"attachment.document_type": document_type}],
+        )
+
+        required_document_result = self.collection.update_one(
+            {"application_id": application_id},
+            {"$set": required_document_updates},
+            array_filters=[{"document.document_type": document_type}],
+        )
+
+        document_collection_result = self.documents_collection.update_one(
             {
-                "application_id": application_id
+                "application_id": application_id,
+                "document_type": document_type,
             },
+            {"$set": document_collection_updates},
+        )
+
+        return {
+            "attachment_matched": attachment_result.matched_count,
+            "attachment_modified": attachment_result.modified_count,
+            "required_document_matched": required_document_result.matched_count,
+            "required_document_modified": required_document_result.modified_count,
+            "document_collection_matched": document_collection_result.matched_count,
+            "document_collection_modified": document_collection_result.modified_count,
+        }
+
+    def push_internal_note(self, application_id: str, note: dict):
+        return self.collection.update_one(
+            {"application_id": application_id},
             {
-                "$push": {
-                    "internal.notes": note
-                },
-                "$set": {
-                    "timestamps.updated_at": datetime.now()
-                },
+                "$push": {"internal.notes": note},
+                "$set": {"timestamps.updated_at": datetime.utcnow()},
             },
         )
 
@@ -187,12 +217,10 @@ class ApplicationRepository:
         This function is used by Module 3 survey report endpoint.
         """
 
-        now = datetime.now()
+        now = datetime.utcnow()
 
         result = self.collection.update_one(
-            {
-                "application_id": application_id
-            },
+            {"application_id": application_id},
             {
                 "$set": {
                     "status": "surveyed",
@@ -201,23 +229,21 @@ class ApplicationRepository:
                         "legal_review",
                         "under_objection",
                         "on_hold",
-                        "rejected"
+                        "rejected",
                     ],
                     "survey_report.exists": True,
                     "survey_report.uploaded_at": now,
                     "timestamps.surveyed_at": now,
-                    "timestamps.updated_at": now
+                    "timestamps.updated_at": now,
                 }
-            }
+            },
         )
 
         if result.matched_count == 0:
             return None
 
         updated_application = self.collection.find_one(
-            {
-                "application_id": application_id
-            }
+            {"application_id": application_id}
         )
 
         return fix_mongo_document(updated_application)
@@ -225,36 +251,32 @@ class ApplicationRepository:
     def save_registrar_review(
         self,
         application_id: str,
-        review_data: dict
+        review_data: dict,
     ):
         """
         Save registrar review data inside the application.
         """
 
-        now = datetime.now()
+        now = datetime.utcnow()
 
         review_data = review_data.copy()
         review_data["reviewed_at"] = now
 
         result = self.collection.update_one(
-            {
-                "application_id": application_id
-            },
+            {"application_id": application_id},
             {
                 "$set": {
                     "registrar_review": review_data,
-                    "timestamps.updated_at": now
+                    "timestamps.updated_at": now,
                 }
-            }
+            },
         )
 
         if result.matched_count == 0:
             return None
 
         updated_application = self.collection.find_one(
-            {
-                "application_id": application_id
-            }
+            {"application_id": application_id}
         )
 
         return fix_mongo_document(updated_application)
