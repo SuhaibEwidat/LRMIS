@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
 import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Popup,
+  useMapEvents,
+} from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import {
   getApplicantProfile,
   getApplicantApplications,
   createApplication,
@@ -24,6 +32,60 @@ const PENDING_STATES = [
   "missing_documents",
   "on_hold",
   "under_objection",
+];
+
+const MAP_DEFAULT_CENTER = [31.9021, 35.2001];
+const PARCEL_POLYGON_DELTA = 0.00045;
+
+const APPLICATION_TYPES = [
+  { value: "first_registration", label: "First Registration" },
+  { value: "ownership_transfer", label: "Ownership Transfer" },
+  { value: "parcel_subdivision", label: "Parcel Subdivision" },
+  { value: "parcel_merge", label: "Parcel Merge" },
+  { value: "boundary_correction", label: "Boundary Correction" },
+  { value: "certificate_request", label: "Certificate Request" },
+];
+
+const REQUIRED_DOCUMENTS_BY_APPLICATION_TYPE = {
+  first_registration: [
+    { document_type: "id_copy", label: "ID Copy" },
+    { document_type: "ownership_deed", label: "Ownership Deed" },
+    { document_type: "parcel_map", label: "Parcel Map" },
+  ],
+  ownership_transfer: [
+    { document_type: "id_copy", label: "ID Copy" },
+    { document_type: "ownership_deed", label: "Ownership Deed" },
+    { document_type: "sale_contract", label: "Sale Contract" },
+  ],
+  parcel_subdivision: [
+    { document_type: "id_copy", label: "ID Copy" },
+    { document_type: "ownership_deed", label: "Ownership Deed" },
+    { document_type: "parcel_map", label: "Parcel Map" },
+  ],
+  parcel_merge: [
+    { document_type: "id_copy", label: "ID Copy" },
+    { document_type: "ownership_deed", label: "Ownership Deed" },
+    { document_type: "parcel_map", label: "Parcel Map" },
+  ],
+  boundary_correction: [
+    { document_type: "id_copy", label: "ID Copy" },
+    { document_type: "ownership_deed", label: "Ownership Deed" },
+    { document_type: "parcel_map", label: "Parcel Map" },
+  ],
+  certificate_request: [
+    { document_type: "id_copy", label: "ID Copy" },
+    { document_type: "ownership_deed", label: "Ownership Deed" },
+  ],
+};
+
+const DOCUMENT_OPTIONS = [
+  { value: "id_copy", label: "ID Copy" },
+  { value: "ownership_deed", label: "Ownership Deed" },
+  { value: "sale_contract", label: "Sale Contract" },
+  { value: "parcel_map", label: "Parcel Map" },
+  { value: "survey_report", label: "Survey Report" },
+  { value: "court_decision", label: "Court Decision" },
+  { value: "other", label: "Other" },
 ];
 
 function getUserFromStorage() {
@@ -183,6 +245,306 @@ function getSurveyStatus(application) {
   return surveyStatusByWorkflow[status] || "Survey status is not available yet.";
 }
 
+function getApplicationTypeLabel(type) {
+  return (
+    APPLICATION_TYPES.find((item) => item.value === type)?.label ||
+    formatDocumentType(type)
+  );
+}
+
+function getRequiredDocumentsForApplicationType(applicationType) {
+  return REQUIRED_DOCUMENTS_BY_APPLICATION_TYPE[applicationType] || [];
+}
+
+function buildParcelPolygon(latValue, lngValue) {
+  const lat = Number(latValue);
+  const lng = Number(lngValue);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  const delta = PARCEL_POLYGON_DELTA;
+
+  return {
+    type: "Polygon",
+    coordinates: [
+      [
+        [lng - delta, lat - delta],
+        [lng + delta, lat - delta],
+        [lng + delta, lat + delta],
+        [lng - delta, lat + delta],
+        [lng - delta, lat - delta],
+      ],
+    ],
+  };
+}
+
+function getCoordinatesFromGeometry(geometry) {
+  const coordinates = geometry?.coordinates?.[0]?.[0];
+
+  if (!Array.isArray(coordinates) || coordinates.length < 2) {
+    return null;
+  }
+
+  const [lng, lat] = coordinates;
+
+  if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+    return null;
+  }
+
+  return { lat: Number(lat), lng: Number(lng) };
+}
+
+function MapClickHandler({ onSelect }) {
+  useMapEvents({
+    click(event) {
+      onSelect({
+        lat: event.latlng.lat.toFixed(6),
+        lng: event.latlng.lng.toFixed(6),
+      });
+    },
+  });
+
+  return null;
+}
+
+function ParcelLocationPicker({ lat, lng, onSelect }) {
+  const selectedLocation =
+    lat && lng ? { lat: Number(lat), lng: Number(lng) } : null;
+
+  const center = selectedLocation
+    ? [selectedLocation.lat, selectedLocation.lng]
+    : MAP_DEFAULT_CENTER;
+
+  return (
+    <div className="parcel-map-section">
+      <div className="section-heading-row">
+        <div>
+          <h3>Choose Parcel Location on Map</h3>
+          <p>Click on the map to generate a small GeoJSON polygon for this parcel.</p>
+        </div>
+
+        <span className="map-status-pill">
+          {selectedLocation ? "Location selected" : "Location required"}
+        </span>
+      </div>
+
+      <div className="parcel-map-picker">
+        <MapContainer center={center} zoom={16} scrollWheelZoom className="leaflet-map">
+          <TileLayer
+            attribution='&copy; OpenStreetMap contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          <MapClickHandler onSelect={onSelect} />
+
+          {selectedLocation && (
+            <CircleMarker
+              center={[selectedLocation.lat, selectedLocation.lng]}
+              radius={10}
+              pathOptions={{ weight: 3 }}
+            >
+              <Popup>Selected parcel location</Popup>
+            </CircleMarker>
+          )}
+        </MapContainer>
+      </div>
+
+      <div className="location-grid">
+        <div>
+          <span>Latitude</span>
+          <strong>{lat || "Click map"}</strong>
+        </div>
+
+        <div>
+          <span>Longitude</span>
+          <strong>{lng || "Click map"}</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniParcelMap({ application }) {
+  const fromGeometry = getCoordinatesFromGeometry(application?.parcel_geometry);
+  const lat = application?.location_lat || fromGeometry?.lat;
+  const lng = application?.location_lng || fromGeometry?.lng;
+
+  if (!lat || !lng) {
+    return (
+      <div className="map-placeholder-small">
+        Parcel location is not available for this application.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mini-map-wrapper">
+      <MapContainer
+        center={[Number(lat), Number(lng)]}
+        zoom={16}
+        scrollWheelZoom={false}
+        className="leaflet-map mini"
+      >
+        <TileLayer
+          attribution='&copy; OpenStreetMap contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+
+        <CircleMarker
+          center={[Number(lat), Number(lng)]}
+          radius={9}
+          pathOptions={{ weight: 3 }}
+        >
+          <Popup>Parcel location</Popup>
+        </CircleMarker>
+      </MapContainer>
+    </div>
+  );
+}
+
+function ApplicantInfoSummary({ profile, user }) {
+  const identity = profile?.identity || user?.identity || {};
+  const contacts = profile?.contacts || user?.contacts || {};
+  const address = profile?.address || user?.address || {};
+
+  const items = [
+    ["Full Name", profile?.full_name || user?.full_name || user?.name || "-"],
+    ["Applicant Type", formatStatus(profile?.applicant_type || user?.applicant_type || "citizen")],
+    ["National ID", identity.national_id || "-"],
+    ["Registration No.", identity.registration_number || "-"],
+    ["Email", contacts.email || user?.email || "-"],
+    ["Phone", contacts.phone || user?.phone || "-"],
+    ["City", address.city || "-"],
+    ["Address Zone", address.zone_id || "-"],
+  ];
+
+  return (
+    <div className="form-section-card">
+      <div className="section-heading-row">
+        <div>
+          <h3>Applicant Information</h3>
+          <p>These values are taken from the applicant profile used at login.</p>
+        </div>
+      </div>
+
+      <div className="readonly-info-grid">
+        {items.map(([label, value]) => (
+          <div key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RequiredDocumentsPicker({ applicationType, files, onFileChange }) {
+  const requiredDocuments = getRequiredDocumentsForApplicationType(applicationType);
+
+  return (
+    <div className="form-section-card">
+      <div className="section-heading-row">
+        <div>
+          <h3>Upload Required Documents</h3>
+          <p>Optional now, but uploading them here reduces missing-document requests later.</p>
+        </div>
+
+        <span className="map-status-pill">
+          {requiredDocuments.length} required
+        </span>
+      </div>
+
+      <div className="required-upload-grid">
+        {requiredDocuments.map((document) => (
+          <label className="required-upload-card" key={document.document_type}>
+            <span>{document.label}</span>
+            <small>Allowed: PDF, Word, JPG, PNG</small>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              onChange={(event) =>
+                onFileChange(document.document_type, event.target.files?.[0] || null)
+              }
+            />
+            <strong>{files[document.document_type]?.name || "No file selected"}</strong>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DocumentsStatusPanel({ applications, documentsByApplication, onUploadClick }) {
+  if (!applications.length) {
+    return (
+      <div className="document-review-panel">
+        <h3>Document Review Status</h3>
+        <p className="track-empty">No applications yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="document-review-panel">
+      <h3>Document Review Status</h3>
+
+      <div className="document-review-list">
+        {applications.map((application) => {
+          const applicationId = application.application_id;
+          const documents = documentsByApplication[applicationId] || [];
+
+          return (
+            <div className="document-review-card" key={applicationId || application._id}>
+              <div className="document-review-header">
+                <div>
+                  <strong>{applicationId || "Application"}</strong>
+                  <span>{getApplicationTypeLabel(application.application_type)}</span>
+                </div>
+
+                <button
+                  type="button"
+                  className="secondary-action-btn compact"
+                  onClick={() => onUploadClick(applicationId)}
+                >
+                  Upload to this
+                </button>
+              </div>
+
+              {documents.length === 0 ? (
+                <p className="track-empty">No uploaded documents yet.</p>
+              ) : (
+                <div className="documents-list">
+                  {documents.map((document) => (
+                    <div className="document-row" key={document.document_id || document.file_url}>
+                      <div>
+                        <strong>{formatDocumentType(document.document_type)}</strong>
+                        <span>{document.file_name}</span>
+                      </div>
+
+                      <span className="document-status">
+                        {formatStatus(document.status || "pending_review")}
+                      </span>
+
+                      {document.file_url && (
+                        <a href={`${API_URL}${document.file_url}`} target="_blank" rel="noreferrer">
+                          View File
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ApplicantDashboard() {
   const [activeSection, setActiveSection] = useState("overview");
 
@@ -229,8 +591,12 @@ const [objectionForm, setObjectionForm] = useState({
     block_number: "",
     basin_number: "",
     zone_id: "",
+    location_lat: "",
+    location_lng: "",
     description: "",
   });
+
+  const [applicationDocumentFiles, setApplicationDocumentFiles] = useState({});
 
   useEffect(() => {
     const storedUser = getUserFromStorage();
@@ -310,6 +676,56 @@ const [objectionForm, setObjectionForm] = useState({
       ...previousForm,
       [name]: value,
     }));
+
+    if (name === "application_type") {
+      setApplicationDocumentFiles({});
+    }
+  }
+
+  function handleLocationSelect(location) {
+    setApplicationForm((previousForm) => ({
+      ...previousForm,
+      location_lat: location.lat,
+      location_lng: location.lng,
+    }));
+  }
+
+  function handleRequiredDocumentFileChange(documentType, file) {
+    setApplicationDocumentFiles((previousFiles) => ({
+      ...previousFiles,
+      [documentType]: file,
+    }));
+  }
+
+  async function uploadSelectedRequiredDocuments(applicationId, applicantId) {
+    const requiredDocuments = getRequiredDocumentsForApplicationType(
+      applicationForm.application_type
+    );
+
+    const selectedDocuments = requiredDocuments.filter(
+      (document) => applicationDocumentFiles[document.document_type]
+    );
+
+    for (const document of selectedDocuments) {
+      const formData = new FormData();
+
+      formData.append("document_type", document.document_type);
+      formData.append("uploaded_by", applicantId);
+      formData.append("notes", "Uploaded during application submission");
+      formData.append("file", applicationDocumentFiles[document.document_type]);
+
+      await addApplicationDocument(applicationId, formData);
+    }
+
+    return selectedDocuments.length;
+  }
+
+  function prepareDocumentUpload(applicationId) {
+    setDocumentForm((previousForm) => ({
+      ...previousForm,
+      application_id: applicationId || "",
+    }));
+    setActiveSection("documents");
   }
 
   async function handleCreateApplication(e) {
@@ -346,6 +762,24 @@ const [objectionForm, setObjectionForm] = useState({
       return;
     }
 
+    if (!applicationForm.location_lat || !applicationForm.location_lng) {
+      setSubmitMessage({
+        text: "Please choose the parcel location on the map.",
+        type: "error",
+      });
+      return;
+    }
+
+    const parcelGeometry = buildParcelPolygon(
+      applicationForm.location_lat,
+      applicationForm.location_lng
+    );
+
+    if (!parcelGeometry) {
+      setSubmitMessage({ text: "Invalid parcel map location.", type: "error" });
+      return;
+    }
+
     const payload = {
       application_type: applicationForm.application_type,
       priority: applicationForm.priority,
@@ -366,7 +800,7 @@ const [objectionForm, setObjectionForm] = useState({
         owner_refs: [],
       },
 
-      parcel_geometry: {},
+      parcel_geometry: parcelGeometry,
 
       description:
         applicationForm.description.trim() ||
@@ -389,6 +823,31 @@ const [objectionForm, setObjectionForm] = useState({
         response.data ||
         {};
 
+      const createdApplicationId =
+        createdApplication.application_id ||
+        createdApplication?.data?.application_id ||
+        createdApplication?._id ||
+        createdApplication?.id;
+
+      let uploadedDocumentsCount = 0;
+      let documentUploadWarning = "";
+
+      if (createdApplicationId) {
+        try {
+          uploadedDocumentsCount = await uploadSelectedRequiredDocuments(
+            createdApplicationId,
+            applicantId
+          );
+        } catch (documentError) {
+          console.log(
+            "Required document upload error:",
+            documentError.response?.data || documentError
+          );
+          documentUploadWarning =
+            " Application was created, but one or more documents were not uploaded.";
+        }
+      }
+
       const confirmationApplication = {
         ...payload,
         ...createdApplication,
@@ -401,6 +860,9 @@ const [objectionForm, setObjectionForm] = useState({
           createdApplication?.submitted_at ||
           createdApplication?.created_at ||
           new Date().toISOString(),
+        location_lat: applicationForm.location_lat,
+        location_lng: applicationForm.location_lng,
+        uploaded_documents_count: uploadedDocumentsCount,
       };
 
       setApplicationForm({
@@ -410,8 +872,11 @@ const [objectionForm, setObjectionForm] = useState({
         block_number: "",
         basin_number: "",
         zone_id: "",
+        location_lat: "",
+        location_lng: "",
         description: "",
       });
+      setApplicationDocumentFiles({});
 
       await loadApplicantData(user);
 
@@ -419,8 +884,12 @@ const [objectionForm, setObjectionForm] = useState({
       setActiveSection("confirmation");
 
       setSubmitMessage({
-        text: "Application submitted successfully.",
-        type: "success",
+        text: `Application submitted successfully.${
+          uploadedDocumentsCount
+            ? ` ${uploadedDocumentsCount} document(s) uploaded.`
+            : ""
+        }${documentUploadWarning}`,
+        type: documentUploadWarning ? "error" : "success",
       });
     } catch (error) {
       console.log("Create application error:", error.response?.data || error);
@@ -495,7 +964,15 @@ const [objectionForm, setObjectionForm] = useState({
         file: null,
       });
 
-      setDocumentMessage("Document uploaded successfully.");
+      setDocumentMessage("Document uploaded successfully. Review status is now visible below.");
+      await loadApplicantData(user);
+
+      if (trackedApplication?.application_id === documentForm.application_id.trim()) {
+        const documentsResponse = await getApplicationDocuments(
+          documentForm.application_id.trim()
+        );
+        setTrackedDocuments(extractDocuments(documentsResponse.data));
+      }
     } catch (error) {
       console.log("Upload document error:", error.response?.data || error);
 
@@ -771,6 +1248,32 @@ async function handleSubmitObjection(e) {
                   <strong>{approvedApplications}</strong>
                 </div>
               </section>
+
+              <section className="portal-flow-grid">
+                <button type="button" onClick={() => setActiveSection("submit")}>
+                  <span>01</span>
+                  <strong>Submit Application</strong>
+                  <small>Type, applicant data, parcel, map, and documents.</small>
+                </button>
+
+                <button type="button" onClick={() => setActiveSection("track")}>
+                  <span>02</span>
+                  <strong>Track Status</strong>
+                  <small>Timeline, missing documents, notes, and survey state.</small>
+                </button>
+
+                <button type="button" onClick={() => setActiveSection("documents")}>
+                  <span>03</span>
+                  <strong>Upload Documents</strong>
+                  <small>Add files and check document review status.</small>
+                </button>
+
+                <button type="button" onClick={() => setActiveSection("objection")}>
+                  <span>04</span>
+                  <strong>Submit Objection</strong>
+                  <small>Reason, supporting file, and objection status.</small>
+                </button>
+              </section>
             </>
           )}
 
@@ -842,15 +1345,17 @@ async function handleSubmitObjection(e) {
                     <div>
                       <span>Application Type</span>
                       <strong>
-                        {lastSubmittedApplication.application_type?.replaceAll(
-                          "_",
-                          " "
-                        ) ||
-                          lastSubmittedApplication.tags?.[0]?.replaceAll(
-                            "_",
-                            " "
-                          ) ||
-                          "-"}
+                        {getApplicationTypeLabel(
+                          lastSubmittedApplication.application_type ||
+                            lastSubmittedApplication.tags?.[0]
+                        )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>Uploaded Documents</span>
+                      <strong>
+                        {lastSubmittedApplication.uploaded_documents_count || 0}
                       </strong>
                     </div>
                   </div>
@@ -895,10 +1400,7 @@ async function handleSubmitObjection(e) {
                   <div className="confirmation-map">
                     <h3>Parcel Location on Map</h3>
 
-                    <div className="map-placeholder-small">
-                      Parcel location map will be connected later using GeoJSON
-                      / Leaflet.
-                    </div>
+                    <MiniParcelMap application={lastSubmittedApplication} />
                   </div>
 
                   <div className="confirmation-actions">
@@ -928,113 +1430,121 @@ async function handleSubmitObjection(e) {
               <h2>Submit Land Application</h2>
 
               <p>
-                Select the application type, enter parcel details, and submit a
-                new land registration application.
+                Complete the required Student 1 flow: application type, applicant
+                information, parcel fields, map location, required documents, and
+                final submission.
               </p>
 
               <form
                 className="application-form"
                 onSubmit={handleCreateApplication}
               >
-                <div className="form-grid">
-                  <div className="form-row">
-                    <label>Application Type</label>
-                    <select
-                      name="application_type"
-                      value={applicationForm.application_type}
-                      onChange={handleApplicationChange}
-                    >
-                      <option value="first_registration">
-                        First Registration
-                      </option>
-                      <option value="ownership_transfer">
-                        Ownership Transfer
-                      </option>
-                      <option value="parcel_subdivision">
-                        Parcel Subdivision
-                      </option>
-                      <option value="parcel_merge">Parcel Merge</option>
-                      <option value="boundary_correction">
-                        Boundary Correction
-                      </option>
-                      <option value="certificate_request">
-                        Certificate Request
-                      </option>
-                    </select>
+                <ApplicantInfoSummary profile={profile} user={user} />
+
+                <div className="form-section-card">
+                  <div className="section-heading-row">
+                    <div>
+                      <h3>Application and Parcel Information</h3>
+                      <p>Enter the land application type and parcel reference data.</p>
+                    </div>
                   </div>
 
-                  <div className="form-row">
-                    <label>Priority</label>
-                    <select
-                      name="priority"
-                      value={applicationForm.priority}
-                      onChange={handleApplicationChange}
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                  </div>
+                  <div className="form-grid">
+                    <div className="form-row">
+                      <label>Application Type</label>
+                      <select
+                        name="application_type"
+                        value={applicationForm.application_type}
+                        onChange={handleApplicationChange}
+                      >
+                        {APPLICATION_TYPES.map((type) => (
+                          <option value={type.value} key={type.value}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div className="form-row">
-                    <label>Parcel Number</label>
-                    <input
-                      type="text"
-                      name="parcel_number"
-                      placeholder="145"
-                      value={applicationForm.parcel_number}
-                      onChange={handleApplicationChange}
-                    />
-                  </div>
+                    <div className="form-row">
+                      <label>Priority</label>
+                      <select
+                        name="priority"
+                        value={applicationForm.priority}
+                        onChange={handleApplicationChange}
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
 
-                  <div className="form-row">
-                    <label>Block Number</label>
-                    <input
-                      type="text"
-                      name="block_number"
-                      placeholder="12"
-                      value={applicationForm.block_number}
-                      onChange={handleApplicationChange}
-                    />
-                  </div>
+                    <div className="form-row">
+                      <label>Parcel Number</label>
+                      <input
+                        type="text"
+                        name="parcel_number"
+                        placeholder="145"
+                        value={applicationForm.parcel_number}
+                        onChange={handleApplicationChange}
+                      />
+                    </div>
 
-                  <div className="form-row">
-                    <label>Basin Number</label>
-                    <input
-                      type="text"
-                      name="basin_number"
-                      placeholder="3"
-                      value={applicationForm.basin_number}
-                      onChange={handleApplicationChange}
-                    />
-                  </div>
+                    <div className="form-row">
+                      <label>Block Number</label>
+                      <input
+                        type="text"
+                        name="block_number"
+                        placeholder="12"
+                        value={applicationForm.block_number}
+                        onChange={handleApplicationChange}
+                      />
+                    </div>
 
-                  <div className="form-row">
-                    <label>Zone ID</label>
-                    <input
-                      type="text"
-                      name="zone_id"
-                      placeholder="ZONE-RM-01"
-                      value={applicationForm.zone_id}
-                      onChange={handleApplicationChange}
-                    />
-                  </div>
+                    <div className="form-row">
+                      <label>Basin Number</label>
+                      <input
+                        type="text"
+                        name="basin_number"
+                        placeholder="3"
+                        value={applicationForm.basin_number}
+                        onChange={handleApplicationChange}
+                      />
+                    </div>
 
-                  <div className="form-row full">
-                    <label>Description</label>
-                    <textarea
-                      name="description"
-                      placeholder="Write a short description about this application..."
-                      value={applicationForm.description}
-                      onChange={handleApplicationChange}
-                    />
+                    <div className="form-row">
+                      <label>Zone ID</label>
+                      <input
+                        type="text"
+                        name="zone_id"
+                        placeholder="ZONE-RM-01"
+                        value={applicationForm.zone_id}
+                        onChange={handleApplicationChange}
+                      />
+                    </div>
+
+                    <div className="form-row full">
+                      <label>Description</label>
+                      <textarea
+                        name="description"
+                        placeholder="Write a short description about this application..."
+                        value={applicationForm.description}
+                        onChange={handleApplicationChange}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="map-placeholder-small">
-                  Parcel location map will be connected later using OpenStreetMap
-                  + Leaflet.
-                </div>
+                <ParcelLocationPicker
+                  lat={applicationForm.location_lat}
+                  lng={applicationForm.location_lng}
+                  onSelect={handleLocationSelect}
+                />
+
+                <RequiredDocumentsPicker
+                  applicationType={applicationForm.application_type}
+                  files={applicationDocumentFiles}
+                  onFileChange={handleRequiredDocumentFileChange}
+                />
 
                 <button
                   type="submit"
@@ -1134,15 +1644,10 @@ async function handleSubmitObjection(e) {
                       <div>
                         <span>Application Type</span>
                         <strong>
-                          {trackedApplication.application_type?.replaceAll(
-                            "_",
-                            " "
-                          ) ||
-                            trackedApplication.tags?.[0]?.replaceAll(
-                              "_",
-                              " "
-                            ) ||
-                            "-"}
+                          {getApplicationTypeLabel(
+                            trackedApplication.application_type ||
+                              trackedApplication.tags?.[0]
+                          )}
                         </strong>
                       </div>
                     </div>
@@ -1180,6 +1685,9 @@ async function handleSubmitObjection(e) {
                         </strong>
                       </div>
                     </div>
+
+                    <h4 className="track-subtitle">Parcel Location</h4>
+                    <MiniParcelMap application={trackedApplication} />
                   </div>
 
                   <div className="track-card">
@@ -1357,11 +1865,11 @@ async function handleSubmitObjection(e) {
                       value={documentForm.document_type}
                       onChange={handleDocumentChange}
                     >
-                      <option value="id_copy">ID Copy</option>
-                      <option value="ownership_deed">Ownership Deed</option>
-                      <option value="sale_contract">Sale Contract</option>
-                
-                      <option value="other">Other</option>
+                      {DOCUMENT_OPTIONS.map((document) => (
+                        <option value={document.value} key={document.value}>
+                          {document.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -1400,6 +1908,12 @@ async function handleSubmitObjection(e) {
                   </div>
                 )}
               </form>
+
+              <DocumentsStatusPanel
+                applications={applications}
+                documentsByApplication={documentsByApplication}
+                onUploadClick={prepareDocumentUpload}
+              />
             </section>
           )}
 
@@ -1553,12 +2067,9 @@ async function handleSubmitObjection(e) {
                           <h3>{applicationId || "Application"}</h3>
                           <p>
                             Type:{" "}
-                            {application.application_type?.replaceAll(
-                              "_",
-                              " "
-                            ) ||
-                              application.tags?.[0]?.replaceAll("_", " ") ||
-                              "-"}
+                            {getApplicationTypeLabel(
+                              application.application_type || application.tags?.[0]
+                            )}
                           </p>
                         </div>
 
@@ -1579,6 +2090,41 @@ async function handleSubmitObjection(e) {
                           <span>
                             Priority: {application.priority || "normal"}
                           </span>
+                        </div>
+
+                        <div className="application-actions-row">
+                          <button
+                            type="button"
+                            className="secondary-action-btn compact"
+                            onClick={() => {
+                              setTrackId(applicationId || "");
+                              setActiveSection("track");
+                            }}
+                          >
+                            Track
+                          </button>
+
+                          <button
+                            type="button"
+                            className="secondary-action-btn compact"
+                            onClick={() => prepareDocumentUpload(applicationId)}
+                          >
+                            Upload Document
+                          </button>
+
+                          <button
+                            type="button"
+                            className="secondary-action-btn compact"
+                            onClick={() => {
+                              setObjectionForm((previousForm) => ({
+                                ...previousForm,
+                                application_id: applicationId || "",
+                              }));
+                              setActiveSection("objection");
+                            }}
+                          >
+                            Object
+                          </button>
                         </div>
 
                         <div className="application-documents">

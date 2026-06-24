@@ -16,3 +16,7 @@ db = client[DB_NAME]
 
 def get_database():
     return db
+
+
+def get_db():
+    return db
