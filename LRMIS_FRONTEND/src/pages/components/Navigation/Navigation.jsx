@@ -1,16 +1,20 @@
+import { NavLink } from "react-router-dom";
 import "./Navigation.css";
 
 function Navigation({ user, onLogout }) {
   const navItems = [
-    { label: "Overview", href: "#overview" },
-    { label: "My Tasks", href: "#tasks" },
-    { label: "Task Details", href: "#task-details" },
-    { label: "Schedule Visit", href: "#schedule" },
-    { label: "Milestones", href: "#milestones" },
-    { label: "Field Notes", href: "#notes" },
-    { label: "Upload Report", href: "#report" },
-    { label: "Timeline", href: "#timeline" },
+    { label: "My Survey Tasks", to: "/surveyor/tasks" },
+    { label: "Task Execution", to: "/surveyor/execution" },
+    { label: "Live Map", to: "/surveyor/map" },
+    { label: "Analytics", to: "/surveyor/analytics" },
   ];
+
+  const displayName =
+    user?.name ||
+    user?.full_name ||
+    user?.staff_code ||
+    user?.email ||
+    "Surveyor";
 
   return (
     <aside className="navigation">
@@ -26,19 +30,25 @@ function Navigation({ user, onLogout }) {
 
         <nav className="navigation-links">
           {navItems.map((item) => (
-            <a key={item.href} href={item.href}>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                isActive ? "navigation-link active" : "navigation-link"
+              }
+            >
               {item.label}
-            </a>
+            </NavLink>
           ))}
         </nav>
       </div>
 
       <div className="navigation-user">
         <div className="navigation-avatar">
-          {(user?.name || user?.staff_code || "S").charAt(0).toUpperCase()}
+          {displayName.charAt(0).toUpperCase()}
         </div>
 
-        <strong>{user?.name || "Surveyor"}</strong>
+        <strong>{displayName}</strong>
         <span>{user?.staff_code || "Staff Member"}</span>
 
         <button type="button" onClick={onLogout}>

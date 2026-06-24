@@ -1,113 +1,164 @@
 from datetime import datetime
+from uuid import uuid4
+
 from fastapi import HTTPException
 
-from repositories import survey_task,survey_report,application_repository,performance_log,staff
+from repositories.application_repository import ApplicationRepository
+from repositories import staff, survey_task, performance_log
 
-DECISION_TO_APPLICATION_STATUS = {
-    "approved": "legal_review",
-    "needs_correction": "on_hold",
-    "rejected": "rejected"
+
+app_repo = ApplicationRepository()
+
+
+REQUIRED_SKILLS_BY_APPLICATION_TYPE = {
+    "first_registration": ["gps_mapping"],
+    "ownership_transfer": ["boundary_survey"],
+    "parcel_subdivision": ["parcel_subdivision"],
+    "parcel_merge": ["boundary_survey"],
+    "boundary_correction": ["boundary_survey", "gps_mapping"],
+    "certificate_request": []
 }
 
 
-def registrar_review_service(
-    application_id: str,
-    decision: str,
-    reviewed_by: str,
-    notes: str = None
-):
+def get_required_skills(application_type: str):
+    return REQUIRED_SKILLS_BY_APPLICATION_TYPE.get(application_type, [])
+
+
+def auto_assign_surveyor_service(application_id: str):
     """
-    Registrar reviews the survey report.
+    Automatically assign a surveyor to an application.
 
-    allowed decisions:
-    - approved
-    - needs_correction
-    - rejected
+    Policy:
+    - application must be in survey_required
+    - surveyor must be active
+    - surveyor must cover same zone
+    - surveyor workload must be less than max_tasks
+    - surveyor should match required skills
     """
 
-    if decision not in DECISION_TO_APPLICATION_STATUS:
-        raise HTTPException(
-            status_code=400,
-            detail="Decision must be approved, needs_correction, or rejected"
-        )
+    application = app_repo.get_application_by_id(application_id)
 
-    registrar = staff.get_staff_by_id(reviewed_by)
-
-    if not registrar:
-        raise HTTPException(status_code=404, detail="Registrar not found")
-
-    if registrar.get("role") != "registrar":
-        raise HTTPException(
-            status_code=403,
-            detail="Only registrar can review survey reports"
-        )
-
-    task = survey_task.get_task_by_application_id(application_id)
-
-    if not task:
+    if not application:
         raise HTTPException(
             status_code=404,
-            detail="Survey task not found for this application"
+            detail="Application not found"
         )
 
-    if task.get("status") != "report_uploaded":
+    current_state = (
+        application.get("workflow", {}).get("current_state")
+        or application.get("status")
+    )
+
+    if current_state != "survey_required":
         raise HTTPException(
             status_code=400,
-            detail="Registrar review is only allowed after report_uploaded"
+            detail="Application must be in survey_required state before auto assignment"
         )
 
-    report = survey_report.get_report_by_application_id(application_id)
+    existing_task = survey_task.get_task_by_application_id(application_id)
 
-    if not report:
+    if existing_task:
+        return {
+            "message": "Survey task already exists for this application",
+            "survey_task": existing_task
+        }
+
+    parcel_ref = application.get("parcel_ref") or {}
+    zone_id = parcel_ref.get("zone_id")
+
+    if not zone_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Application parcel zone_id is required for auto assignment"
+        )
+
+    application_type = application.get("application_type")
+    required_skills = get_required_skills(application_type)
+
+    available_surveyors = staff.find_available_surveyors(
+        zone_id=zone_id,
+        required_skills=required_skills
+    )
+
+    if not available_surveyors:
         raise HTTPException(
             status_code=404,
-            detail="Survey report not found"
+            detail="No available surveyor found for this zone, workload, and skills"
         )
 
-    next_status = DECISION_TO_APPLICATION_STATUS[decision]
+    selected_surveyor = available_surveyors[0]
 
-    review_data = {
-        "decision": decision,
-        "notes": notes,
-        "reviewed_by": reviewed_by,
-        "reviewed_at": datetime.utcnow()
+    assigned_surveyor_id = selected_surveyor.get("_id")
+    assigned_surveyor_code = selected_surveyor.get("staff_code")
+
+    now = datetime.utcnow()
+
+    task_data = {
+        "task_id": f"SURV-{now.year}-{uuid4().hex[:8].upper()}",
+        "application_id": application_id,
+        "parcel_id": parcel_ref.get("parcel_id"),
+        "parcel_number": parcel_ref.get("parcel_number"),
+        "zone_id": zone_id,
+        "priority": application.get("priority", "normal"),
+
+        "assigned_surveyor_id": assigned_surveyor_id,
+        "assigned_surveyor_code": assigned_surveyor_code,
+
+        "status": "assigned",
+        "scheduled_visit_date": None,
+
+        "milestones": [
+            {
+                "type": "assigned",
+                "at": now,
+                "by": "system",
+                "meta": {
+                    "reason": "auto assignment",
+                    "policy": "zone + workload + skills",
+                    "zone_id": zone_id,
+                    "required_skills": required_skills
+                }
+            }
+        ],
+
+        "field_notes": [],
+        "report_uploaded": False,
+        "created_at": now,
+        "updated_at": now
     }
 
-    updated_report = survey_report.update_report_status(
-        application_id=application_id,
-        status=f"registrar_{decision}",
-        review_data=review_data
+    created_task = survey_task.create_survey_task(task_data)
+
+    updated_surveyor = staff.increase_active_tasks(
+        staff_id=assigned_surveyor_id,
+        amount=1
     )
 
-    updated_task = survey_task.mark_registrar_reviewed(
-        application_id=application_id,
-        registrar_id=reviewed_by,
-        decision=decision
-    )
-
-    updated_application = application_repository.save_registrar_review(
-        application_id=application_id,
-        review_data=review_data,
-        next_status=next_status
+    app_repo.set_fields(
+        application_id,
+        {
+            "assignment.assigned_surveyor_id": assigned_surveyor_id,
+            "assignment.assigned_surveyor_code": assigned_surveyor_code,
+            "assignment.assignment_policy": "zone+workload+skills",
+            "assignment.assigned_at": now
+        }
     )
 
     performance_log.add_event(
         application_id=application_id,
-        event_type="registrar_reviewed",
-        actor_type="registrar",
-        actor_id=reviewed_by,
+        event_type="survey_assigned",
+        actor_type="system",
+        actor_id="assignment_engine",
         meta={
-            "decision": decision,
-            "next_application_status": next_status,
-            "notes": notes
+            "assigned_surveyor_id": assigned_surveyor_id,
+            "assigned_surveyor_code": assigned_surveyor_code,
+            "zone_id": zone_id,
+            "required_skills": required_skills
         }
     )
 
     return {
-        "message": "Registrar review completed successfully",
-        "decision": decision,
-        "next_application_status": next_status,
-        "survey_report": updated_report,
-        "survey_task": updated_task,
-        "application": updated_application
+        "message": "Surveyor assigned successfully",
+        "assigned_surveyor": updated_surveyor,
+        "survey_task": created_task
     }

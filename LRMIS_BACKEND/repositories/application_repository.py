@@ -1,7 +1,3 @@
-# ==============================
-# repositories/application_repository.py
-# ==============================
-
 from datetime import datetime
 from bson import ObjectId
 from database.database import get_database
@@ -63,7 +59,8 @@ class ApplicationRepository:
         return fix_mongo_document(result)
 
     def get_last_application(self):
-        return self.collection.find_one(sort=[("application_id", -1)])
+        result = self.collection.find_one(sort=[("application_id", -1)])
+        return fix_mongo_document(result)
 
     def list_applications(
         self,
@@ -213,3 +210,73 @@ class ApplicationRepository:
                 "$set": {"timestamps.updated_at": datetime.utcnow()},
             },
         )
+
+    def mark_application_surveyed(self, application_id: str):
+        """
+        Mark application as surveyed after uploading survey report.
+        This function is used by Module 3 survey report endpoint.
+        """
+
+        now = datetime.utcnow()
+
+        result = self.collection.update_one(
+            {"application_id": application_id},
+            {
+                "$set": {
+                    "status": "surveyed",
+                    "workflow.current_state": "surveyed",
+                    "workflow.allowed_next": [
+                        "legal_review",
+                        "under_objection",
+                        "on_hold",
+                        "rejected",
+                    ],
+                    "survey_report.exists": True,
+                    "survey_report.uploaded_at": now,
+                    "timestamps.surveyed_at": now,
+                    "timestamps.updated_at": now,
+                }
+            },
+        )
+
+        if result.matched_count == 0:
+            return None
+
+        updated_application = self.collection.find_one(
+            {"application_id": application_id}
+        )
+
+        return fix_mongo_document(updated_application)
+
+    def save_registrar_review(
+        self,
+        application_id: str,
+        review_data: dict,
+    ):
+        """
+        Save registrar review data inside the application.
+        """
+
+        now = datetime.utcnow()
+
+        review_data = review_data.copy()
+        review_data["reviewed_at"] = now
+
+        result = self.collection.update_one(
+            {"application_id": application_id},
+            {
+                "$set": {
+                    "registrar_review": review_data,
+                    "timestamps.updated_at": now,
+                }
+            },
+        )
+
+        if result.matched_count == 0:
+            return None
+
+        updated_application = self.collection.find_one(
+            {"application_id": application_id}
+        )
+
+        return fix_mongo_document(updated_application)
