@@ -118,7 +118,9 @@ def add_objection_to_application(application_id: str, objection_id: str):
     now = datetime.now(timezone.utc)
 
     result = applications_collection.update_one(
-        {"application_id": application_id},
+        {
+            "application_id": application_id
+        },
         {
             "$set": {
                 "objection.has_objection": True,

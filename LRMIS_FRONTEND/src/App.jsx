@@ -4,6 +4,7 @@ import LoginPage from "./pages/Auth/LoginPage";
 import RegisterPage from "./pages/Auth/RegisterPage";
 
 import ApplicantDashboard from "./pages/Applicant/ApplicantDashboard";
+import RegistrarDashboard from "./pages/Registrar/RegistrarDashboard";
 
 import SurveyorLayout from "./pages/Surveyor/SurveyorLayout";
 import MySurveyTasks from "./pages/Surveyor/MySurveyTasks";
@@ -20,6 +21,7 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
 
       <Route path="/applicant-dashboard" element={<ApplicantDashboard />} />
+      <Route path="/registrar-dashboard" element={<RegistrarDashboard />} />
 
       <Route
         path="/surveyor-dashboard"
