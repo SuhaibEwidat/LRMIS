@@ -313,128 +313,135 @@ const [objectionForm, setObjectionForm] = useState({
   }
 
   async function handleCreateApplication(e) {
-    e.preventDefault();
-    setSubmitMessage({ text: "", type: "" });
+  e.preventDefault();
+  setSubmitMessage({ text: "", type: "" });
 
-    const applicantId = getApplicantId(user);
+  const applicantId = getApplicantId(user);
 
-    if (!applicantId) {
-      setSubmitMessage({
-        text: "Applicant ID not found. Please login again.",
-        type: "error",
-      });
-      return;
-    }
+  if (!applicantId) {
+    setSubmitMessage({
+      text: "Applicant ID not found. Please login again.",
+      type: "error",
+    });
+    return;
+  }
 
-    if (!applicationForm.parcel_number.trim()) {
-      setSubmitMessage({ text: "Parcel number is required.", type: "error" });
-      return;
-    }
+  if (!applicationForm.parcel_number.trim()) {
+    setSubmitMessage({ text: "Parcel number is required.", type: "error" });
+    return;
+  }
 
-    if (!applicationForm.block_number.trim()) {
-      setSubmitMessage({ text: "Block number is required.", type: "error" });
-      return;
-    }
+  if (!applicationForm.block_number.trim()) {
+    setSubmitMessage({ text: "Block number is required.", type: "error" });
+    return;
+  }
 
-    if (!applicationForm.basin_number.trim()) {
-      setSubmitMessage({ text: "Basin number is required.", type: "error" });
-      return;
-    }
+  if (!applicationForm.basin_number.trim()) {
+    setSubmitMessage({ text: "Basin number is required.", type: "error" });
+    return;
+  }
 
-    if (!applicationForm.zone_id.trim()) {
-      setSubmitMessage({ text: "Zone ID is required.", type: "error" });
-      return;
-    }
+  if (!applicationForm.zone_id.trim()) {
+    setSubmitMessage({ text: "Zone ID is required.", type: "error" });
+    return;
+  }
 
-    const payload = {
-      application_type: applicationForm.application_type,
-      priority: applicationForm.priority,
+  const parcelNumber = applicationForm.parcel_number.trim();
+  const blockNumber = applicationForm.block_number.trim();
+  const basinNumber = applicationForm.basin_number.trim();
+  const zoneId = applicationForm.zone_id.trim();
 
-      applicant_ref: {
-        applicant_id: applicantId,
-        applicant_type:
-          profile?.applicant_type || user?.applicant_type || "citizen",
-        submitted_by_representative: false,
-      },
+  const generatedParcelId = `PARCEL-${zoneId}-${parcelNumber}-${blockNumber}-${basinNumber}`;
 
-      parcel_ref: {
-        parcel_id: "",
-        parcel_number: applicationForm.parcel_number.trim(),
-        block_number: applicationForm.block_number.trim(),
-        basin_number: applicationForm.basin_number.trim(),
-        zone_id: applicationForm.zone_id.trim(),
-        owner_refs: [],
-      },
+  const payload = {
+    application_type: applicationForm.application_type,
+    priority: applicationForm.priority,
 
-      parcel_geometry: {},
+    applicant_ref: {
+      applicant_id: applicantId,
+      applicant_type:
+        profile?.applicant_type || user?.applicant_type || "citizen",
+      submitted_by_representative: false,
+    },
 
-      description:
-        applicationForm.description.trim() ||
-        `${applicationForm.application_type} application for parcel ${applicationForm.parcel_number}.`,
+    parcel_ref: {
+      parcel_id: generatedParcelId,
+      parcel_number: parcelNumber,
+      block_number: blockNumber,
+      basin_number: basinNumber,
+      zone_id: zoneId,
+      owner_refs: [applicantId],
+    },
 
-      tags: [applicationForm.application_type],
+    parcel_geometry: {},
+
+    description:
+      applicationForm.description.trim() ||
+      `${applicationForm.application_type} application for parcel ${parcelNumber}.`,
+
+    tags: [applicationForm.application_type],
+  };
+
+  const idempotencyKey = `${applicantId}-${Date.now()}`;
+
+  try {
+    setLoading(true);
+    setMessage("");
+
+    const response = await createApplication(payload, idempotencyKey);
+
+    const createdApplication =
+      response.data?.data ||
+      response.data?.application ||
+      response.data ||
+      {};
+
+    const confirmationApplication = {
+      ...payload,
+      ...createdApplication,
+      status:
+        getApplicationStatus(createdApplication) !== "unknown"
+          ? getApplicationStatus(createdApplication)
+          : "submitted",
+      submitted_at:
+        createdApplication?.timestamps?.submitted_at ||
+        createdApplication?.submitted_at ||
+        createdApplication?.created_at ||
+        new Date().toISOString(),
     };
 
-    const idempotencyKey = `${applicantId}-${Date.now()}`;
+    setApplicationForm({
+      application_type: "ownership_transfer",
+      priority: "normal",
+      parcel_number: "",
+      block_number: "",
+      basin_number: "",
+      zone_id: "",
+      description: "",
+    });
 
-    try {
-      setLoading(true);
-      setMessage("");
+    await loadApplicantData(user);
 
-      const response = await createApplication(payload, idempotencyKey);
+    setLastSubmittedApplication(confirmationApplication);
+    setActiveSection("confirmation");
 
-      const createdApplication =
-        response.data?.data ||
-        response.data?.application ||
-        response.data ||
-        {};
+    setSubmitMessage({
+      text: "Application submitted successfully.",
+      type: "success",
+    });
+  } catch (error) {
+    console.log("Create application error:", error.response?.data || error);
 
-      const confirmationApplication = {
-        ...payload,
-        ...createdApplication,
-        status:
-          getApplicationStatus(createdApplication) !== "unknown"
-            ? getApplicationStatus(createdApplication)
-            : "submitted",
-        submitted_at:
-          createdApplication?.timestamps?.submitted_at ||
-          createdApplication?.submitted_at ||
-          createdApplication?.created_at ||
-          new Date().toISOString(),
-      };
-
-      setApplicationForm({
-        application_type: "ownership_transfer",
-        priority: "normal",
-        parcel_number: "",
-        block_number: "",
-        basin_number: "",
-        zone_id: "",
-        description: "",
-      });
-
-      await loadApplicantData(user);
-
-      setLastSubmittedApplication(confirmationApplication);
-      setActiveSection("confirmation");
-
-      setSubmitMessage({
-        text: "Application submitted successfully.",
-        type: "success",
-      });
-    } catch (error) {
-      console.log("Create application error:", error.response?.data || error);
-
-      setSubmitMessage({
-        text:
-          error.response?.data?.detail ||
-          "Failed to submit application. Please check your data.",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
+    setSubmitMessage({
+      text:
+        error.response?.data?.detail ||
+        "Failed to submit application. Please check your data.",
+      type: "error",
+    });
+  } finally {
+    setLoading(false);
   }
+}
 
   function handleDocumentChange(e) {
     const { name, value } = e.target;
