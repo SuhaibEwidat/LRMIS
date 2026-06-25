@@ -15,6 +15,19 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  function validateField(name, value) {
+    if (name === "email") {
+      if (!value.trim()) return "Email is required";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "Enter a valid email address";
+    }
+    if (name === "password") {
+      if (!value) return "Password is required";
+      if (value.length < 6) return "Password must be at least 6 characters";
+    }
+    return "";
+  }
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -23,10 +36,31 @@ function LoginPage() {
       ...prev,
       [name]: value,
     }));
+
+    if (errors[name]) {
+      const error = validateField(name, value);
+      setErrors((prev) => ({ ...prev, [name]: error }));
+    }
+  }
+
+  function handleBlur(e) {
+    const { name, value } = e.target;
+    const error = validateField(name, value);
+    setErrors((prev) => ({ ...prev, [name]: error }));
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
+
+    const emailError = validateField("email", formData.email);
+    const passwordError = validateField("password", formData.password);
+
+    if (emailError || passwordError) {
+      setErrors({ email: emailError, password: passwordError });
+      return;
+    }
+
+    setErrors({});
     setLoading(true);
     setMessage("");
 
@@ -95,50 +129,8 @@ function LoginPage() {
 
   return (
     <div className="auth-page">
-      <div className="auth-layout">
-        {/* ── Left info panel ── */}
-        <div className="auth-info-panel">
-          <svg className="topo-bg" viewBox="0 0 320 560" aria-hidden="true">
-            <path d="M0 180 Q50 140 110 160 Q170 180 220 140 Q270 100 320 130" />
-            <path d="M0 210 Q60 165 120 190 Q180 215 230 168 Q275 125 320 158" />
-            <path d="M0 240 Q70 190 130 220 Q185 245 235 196 Q278 152 320 182" />
-            <path d="M0 270 Q80 215 140 248 Q192 275 240 222 Q281 178 320 208" />
-            <path d="M0 300 Q90 240 150 276 Q198 305 246 250 Q285 205 320 234" />
-            <path d="M40 80 Q90 50 150 70 Q200 88 250 55 Q290 28 320 45" />
-            <path d="M20 110 Q75 76 138 98 Q190 116 244 82 Q284 55 320 72" />
-            <path d="M0 420 Q60 380 130 400 Q195 418 255 375 Q288 350 320 370" />
-            <circle cx="155" cy="220" r="4" />
-            <circle cx="155" cy="220" r="9" />
-            <circle cx="155" cy="220" r="14" />
-          </svg>
-
-          <div className="brand-badge">
-            <span className="brand-dot" />
-            LRMIS
-          </div>
-
-          <div className="panel-body">
-            <h1>
-              Land Registration
-              <br />
-              <em>Management</em>
-            </h1>
-
-            <p>
-              Secure platform for land applications, survey tasks, registrar
-              review, certificates, and status tracking.
-            </p>
-          </div>
-
-          <div className="auth-features">
-            <span>Applicant Portal</span>
-            <span>Surveyor Tasks</span>
-            <span>Registrar Review</span>
-          </div>
-        </div>
-
-        {/* ── Right form card ── */}
-        <div className="auth-card">
+      <div className="auth-layout auth-layout--single">
+        <div className="auth-card auth-card--full">
           <p className="auth-kicker">SECURE ACCESS</p>
 
           <h2>Welcome back</h2>
@@ -192,9 +184,12 @@ function LoginPage() {
                 placeholder="you@example.com"
                 value={formData.email}
                 onChange={handleChange}
+                onBlur={handleBlur}
                 autoComplete="email"
+                className={errors.email ? "input-error" : ""}
                 required
               />
+              {errors.email && <span className="field-error">{errors.email}</span>}
             </div>
 
             <div className="input-group">
@@ -222,7 +217,9 @@ function LoginPage() {
                   placeholder="Enter your password"
                   value={formData.password}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   autoComplete="current-password"
+                  className={errors.password ? "input-error" : ""}
                   required
                 />
 
@@ -262,6 +259,8 @@ function LoginPage() {
                   )}
                 </button>
               </div>
+
+              {errors.password && <span className="field-error">{errors.password}</span>}
 
               <div className="forgot-row">
                 <a href="/forgot-password" className="forgot-link">

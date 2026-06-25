@@ -16,16 +16,12 @@ router = APIRouter(
 )
 
 
-# =========================
 # Uploads Folder
-# =========================
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 
-# =========================
 # Request Schemas
-# =========================
 class SurveyMilestoneRequest(BaseModel):
     milestone_type: str
     by: str
@@ -48,17 +44,13 @@ def model_to_dict(model):
         return model.dict(exclude_unset=True)
 
 
-# =========================
 # Auto Assign Surveyor
-# =========================
 @router.post("/{application_id}/auto-assign-surveyor")
 def auto_assign_surveyor(application_id: str):
     return assignment.auto_assign_surveyor_service(application_id)
 
 
-# =========================
 # Schedule Visit
-# =========================
 @router.post("/{application_id}/schedule-visit")
 def schedule_visit(application_id: str, request: ScheduleVisitRequest):
     data = model_to_dict(request)
@@ -70,9 +62,7 @@ def schedule_visit(application_id: str, request: ScheduleVisitRequest):
     )
 
 
-# =========================
 # Add Survey Milestone
-# =========================
 @router.patch("/{application_id}/survey-milestone")
 def add_survey_milestone(application_id: str, request: SurveyMilestoneRequest):
     data = model_to_dict(request)
@@ -85,9 +75,7 @@ def add_survey_milestone(application_id: str, request: SurveyMilestoneRequest):
     )
 
 
-# =========================
 # Add Field Note
-# =========================
 @router.post("/{application_id}/field-note")
 def add_field_note(application_id: str, request: FieldNoteRequest):
     data = model_to_dict(request)
@@ -98,9 +86,7 @@ def add_field_note(application_id: str, request: FieldNoteRequest):
     )
 
 
-# =========================
 # Upload Survey Report File
-# =========================
 @router.post("/{application_id}/survey-report")
 async def upload_survey_report(
     application_id: str,

@@ -1,5 +1,5 @@
 import { Outlet, useNavigate } from "react-router-dom";
-import Header from "../components/Header/Header";
+
 import Navigation from "../components/Navigation/Navigation";
 import "./SurveyorLayout.css";
 
@@ -26,11 +26,6 @@ function SurveyorLayout() {
       <Navigation user={user} onLogout={logout} />
 
       <main className="surveyor-main">
-        <Header
-          title="Surveyor Workspace"
-          subtitle="Manage field tasks, parcel map, and analytics"
-        />
-
         <Outlet />
       </main>
     </div>

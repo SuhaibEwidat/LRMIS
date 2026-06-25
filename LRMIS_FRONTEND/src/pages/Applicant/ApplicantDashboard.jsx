@@ -679,9 +679,6 @@ async function handleSubmitObjection(e) {
   return (
     <div className="applicant-page">
       <aside className="applicant-sidebar">
-        <h2>LRMIS</h2>
-        <p>Applicant Portal</p>
-
         <button
           type="button"
           className={`sidebar-nav-item ${
@@ -753,12 +750,8 @@ async function handleSubmitObjection(e) {
             <>
               <section id="overview" className="applicant-header">
                 <div>
-                  <p className="label">Applicant Workspace</p>
+                  <p className="label">Team 16</p>
                   <h1>Welcome, {applicantName}</h1>
-                  <span>
-                    Submit land registration applications, track status, upload
-                    required documents, and manage objections.
-                  </span>
                 </div>
               </section>
 
@@ -899,14 +892,6 @@ async function handleSubmitObjection(e) {
                     </div>
                   </div>
 
-                  <div className="confirmation-map">
-                    <h3>Parcel Location on Map</h3>
-
-                    <div className="map-placeholder-small">
-                      Parcel location map will be connected later using GeoJSON
-                      / Leaflet.
-                    </div>
-                  </div>
 
                   <div className="confirmation-actions">
                     <button
@@ -1038,10 +1023,6 @@ async function handleSubmitObjection(e) {
                   </div>
                 </div>
 
-                <div className="map-placeholder-small">
-                  Parcel location map will be connected later using OpenStreetMap
-                  + Leaflet.
-                </div>
 
                 <button
                   type="submit"

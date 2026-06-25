@@ -9,6 +9,11 @@ from services.Module4.analytics_service import (
     get_registrar_workload_service,
     get_parcels_geofeed_service,
     get_pending_heatmap_service,
+    get_advanced_kpis_service,
+    get_zone_heatmap_service,
+    get_all_applications_geojson_service,
+    get_disputed_parcels_geojson_service,
+    get_survey_required_geojson_service,
 )
 
 router = APIRouter(prefix="/analytics", tags=["Module 4 - Analytics"])
@@ -52,3 +57,28 @@ def get_parcels_geofeed():
 @router.get("/geofeeds/pending-heatmap")
 def get_pending_heatmap():
     return get_pending_heatmap_service()
+
+
+@router.get("/advanced-kpis")
+def get_advanced_kpis():
+    return get_advanced_kpis_service()
+
+
+@router.get("/zone-heatmap")
+def get_zone_heatmap():
+    return get_zone_heatmap_service()
+
+
+@router.get("/geofeeds/all-applications")
+def get_all_applications_geojson():
+    return get_all_applications_geojson_service()
+
+
+@router.get("/geofeeds/disputed-parcels")
+def get_disputed_parcels():
+    return get_disputed_parcels_geojson_service()
+
+
+@router.get("/geofeeds/survey-required")
+def get_survey_required():
+    return get_survey_required_geojson_service()

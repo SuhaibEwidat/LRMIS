@@ -19,15 +19,6 @@ function Navigation({ user, onLogout }) {
   return (
     <aside className="navigation">
       <div>
-        <div className="navigation-brand">
-          <div className="navigation-logo">L</div>
-
-          <div>
-            <h2>LRMIS</h2>
-            <p>Surveyor Panel</p>
-          </div>
-        </div>
-
         <nav className="navigation-links">
           {navItems.map((item) => (
             <NavLink
@@ -44,13 +35,6 @@ function Navigation({ user, onLogout }) {
       </div>
 
       <div className="navigation-user">
-        <div className="navigation-avatar">
-          {displayName.charAt(0).toUpperCase()}
-        </div>
-
-        <strong>{displayName}</strong>
-        <span>{user?.staff_code || "Staff Member"}</span>
-
         <button type="button" onClick={onLogout}>
           Logout
         </button>

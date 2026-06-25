@@ -100,6 +100,127 @@ function SimpleBarList({ items, labelKeys, valueKeys, emptyText }) {
   );
 }
 
+const STATUS_COLORS = [
+  "#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#64748b",
+];
+
+function DonutChart({ items, labelKeys, valueKeys }) {
+  if (!items || items.length === 0) {
+    return <div className="empty-box">No status data available.</div>;
+  }
+
+  const data = items.map((item) => ({
+    label: formatLabel(getValue(item, labelKeys, "Unknown")),
+    value: Number(getValue(item, valueKeys, 0)),
+  }));
+
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  if (total === 0) {
+    return <div className="empty-box">No status data available.</div>;
+  }
+
+  const size = 180;
+  const stroke = 32;
+  const radius = (size - stroke) / 2;
+  const center = size / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  let offset = 0;
+  const segments = data.map((d, i) => {
+    const pct = d.value / total;
+    const dash = pct * circumference;
+    const gap = circumference - dash;
+    const rotation = (offset / total) * 360 - 90;
+    offset += d.value;
+    return { ...d, dash, gap, rotation, color: STATUS_COLORS[i % STATUS_COLORS.length] };
+  });
+
+  return (
+    <div className="donut-wrapper">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="donut-svg">
+        {segments.map((seg, i) => (
+          <circle
+            key={i}
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={stroke}
+            strokeDasharray={`${seg.dash} ${seg.gap}`}
+            transform={`rotate(${seg.rotation} ${center} ${center})`}
+          />
+        ))}
+        <text x={center} y={center - 6} textAnchor="middle" className="donut-total">{total}</text>
+        <text x={center} y={center + 12} textAnchor="middle" className="donut-total-label">Total</text>
+      </svg>
+
+      <div className="donut-legend">
+        {segments.map((seg, i) => (
+          <div key={i} className="donut-legend-item">
+            <span className="donut-dot" style={{ background: seg.color }} />
+            <span className="donut-label">{seg.label}</span>
+            <strong>{seg.value}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HeatMapGrid({ items, labelKeys, valueKeys }) {
+  if (!items || items.length === 0) {
+    return <div className="empty-box">No zone data available.</div>;
+  }
+
+  const data = items.map((item) => ({
+    label: formatLabel(getValue(item, labelKeys, "Unknown")),
+    value: Number(getValue(item, valueKeys, 0)),
+  }));
+
+  const maxVal = Math.max(...data.map((d) => d.value), 1);
+
+  function getHeatColor(value) {
+    const intensity = value / maxVal;
+    if (intensity > 0.75) return { bg: "#dc2626", color: "#fff" };
+    if (intensity > 0.5) return { bg: "#f97316", color: "#fff" };
+    if (intensity > 0.25) return { bg: "#facc15", color: "#111" };
+    return { bg: "#bbf7d0", color: "#111" };
+  }
+
+  return (
+    <div className="heatmap-wrapper">
+      <div className="heatmap-grid">
+        {data.map((d, i) => {
+          const heat = getHeatColor(d.value);
+          return (
+            <div
+              key={i}
+              className="heatmap-cell"
+              style={{ background: heat.bg, color: heat.color }}
+            >
+              <strong>{d.value}</strong>
+              <span>{d.label}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="heatmap-legend">
+        <span>Low</span>
+        <div className="heatmap-scale">
+          <div style={{ background: "#bbf7d0" }} />
+          <div style={{ background: "#facc15" }} />
+          <div style={{ background: "#f97316" }} />
+          <div style={{ background: "#dc2626" }} />
+        </div>
+        <span>High</span>
+      </div>
+    </div>
+  );
+}
+
 function AnalyticsDashboard() {
   const [kpis, setKpis] = useState({});
   const [applicationsByStatus, setApplicationsByStatus] = useState([]);
@@ -253,12 +374,8 @@ function AnalyticsDashboard() {
     <>
       <section className="surveyor-page-header">
         <div>
-          <p className="surveyor-label">Surveyor Workspace</p>
+          <p className="surveyor-label">Team 16</p>
           <h1>Analytics Dashboard</h1>
-          <span>
-            View operational insights about applications, zones, processing
-            time, surveyor workload, registrar workload, and certificates.
-          </span>
         </div>
       </section>
 
@@ -409,30 +526,26 @@ function AnalyticsDashboard() {
           />
         </div>
 
-        <div className="panel analytics-summary-panel">
-          <h2>Dashboard Notes</h2>
-          <p>
-            This dashboard supports management decisions by showing backlog,
-            approval progress, delayed work, surveyor workload, and registrar
-            review load.
-          </p>
+        <div className="panel">
+          <h2>Status Distribution</h2>
+          <p>Application status breakdown.</p>
 
-          <div className="analytics-notes">
-            <div>
-              <strong>Backlog</strong>
-              <span>Pending and under-objection applications need follow-up.</span>
-            </div>
+          <DonutChart
+            items={applicationsByStatus}
+            labelKeys={["status", "_id", "name"]}
+            valueKeys={["count", "total", "value"]}
+          />
+        </div>
 
-            <div>
-              <strong>Workload</strong>
-              <span>Surveyor and registrar analytics help balance tasks.</span>
-            </div>
+        <div className="panel">
+          <h2>Zone Heat Map</h2>
+          <p>Application volume by zone.</p>
 
-            <div>
-              <strong>Performance</strong>
-              <span>Processing time helps evaluate registration efficiency.</span>
-            </div>
-          </div>
+          <HeatMapGrid
+            items={applicationsByZone}
+            labelKeys={["zone_id", "zone", "_id", "name"]}
+            valueKeys={["count", "total", "value"]}
+          />
         </div>
       </section>
     </>

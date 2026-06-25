@@ -132,6 +132,132 @@ def get_registrar_workload_service():
     }
 
 
+def get_advanced_kpis_service():
+    raw = repo.get_advanced_kpis()
+
+    processing = raw.get("avg_processing_time", [{}])
+    proc = processing[0] if processing else {}
+
+    rejection = raw.get("rejection_rate", [{}])
+    rej = rejection[0] if rejection else {}
+
+    approval = raw.get("approval_rate", [{}])
+    apr = approval[0] if approval else {}
+
+    return {
+        "total_applications": _count_from_facet(raw.get("total", [])),
+        "rejected_count": _count_from_facet(raw.get("rejected", [])),
+        "certificates_issued": _count_from_facet(
+            raw.get("certificates_issued", [])
+        ),
+        "rejection_rate_percent": rej.get("rate", 0),
+        "approval_rate_percent": apr.get("rate", 0),
+        "processing_time": {
+            "avg_days": round(proc.get("avg_days", 0), 2),
+            "min_days": round(proc.get("min_days", 0), 2),
+            "max_days": round(proc.get("max_days", 0), 2),
+            "completed_count": proc.get("count", 0),
+        },
+        "by_priority": [
+            {"priority": g["_id"], "count": g["count"]}
+            for g in raw.get("by_priority", [])
+        ],
+        "by_type": [
+            {"application_type": g["_id"], "count": g["count"]}
+            for g in raw.get("by_type", [])
+        ],
+        "monthly_trend": raw.get("monthly_trend", []),
+        "avg_processing_by_zone": raw.get("avg_processing_by_zone", []),
+        "objection_stats": raw.get("objection_stats", []),
+    }
+
+
+def get_zone_heatmap_service():
+    data = repo.get_zone_heatmap_data()
+    return {"data": data}
+
+
+def get_all_applications_geojson_service():
+    records = repo.get_all_applications_geojson()
+    features = []
+
+    for app in records:
+        geometry = app.get("geometry")
+        if not geometry:
+            continue
+
+        props = {k: v for k, v in app.items() if k != "geometry"}
+        features.append({
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": props,
+        })
+
+    return _feature_collection(features)
+
+
+def get_disputed_parcels_geojson_service():
+    records = repo.get_all_applications_geojson()
+    features = []
+
+    for app in records:
+        geometry = app.get("geometry")
+        if not geometry:
+            continue
+
+        if not app.get("has_objection") and app.get("status") != "under_objection":
+            continue
+
+        center = _polygon_center(geometry)
+        if center is None:
+            continue
+
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": center},
+            "properties": {
+                "application_id": app.get("application_id"),
+                "status": app.get("status"),
+                "zone_id": app.get("zone_id"),
+                "parcel_number": app.get("parcel_number"),
+                "weight": 2,
+            },
+        })
+
+    return _feature_collection(features)
+
+
+def get_survey_required_geojson_service():
+    records = repo.get_all_applications_geojson()
+    features = []
+
+    for app in records:
+        geometry = app.get("geometry")
+        if not geometry:
+            continue
+
+        if app.get("status") != "survey_required":
+            continue
+
+        center = _polygon_center(geometry)
+        if center is None:
+            continue
+
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": center},
+            "properties": {
+                "application_id": app.get("application_id"),
+                "priority": app.get("priority"),
+                "zone_id": app.get("zone_id"),
+                "parcel_number": app.get("parcel_number"),
+                "weight": 3 if app.get("priority") == "urgent" else 1,
+            },
+        })
+
+    return _feature_collection(features)
+
+
 def get_parcels_geofeed_service():
     """
     Used by:

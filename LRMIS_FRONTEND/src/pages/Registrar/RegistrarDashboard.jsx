@@ -997,11 +997,6 @@ function RegistrarDashboard() {
   return (
     <div className="registrar-page">
       <aside className="registrar-sidebar">
-        <div className="registrar-brand">
-          <h2>LRMIS</h2>
-          <p>Registrar Console</p>
-        </div>
-
         <nav className="registrar-nav">
           <button
             type="button"
@@ -1052,12 +1047,8 @@ function RegistrarDashboard() {
         {activeSection === "overview" && (
           <>
             <section className="registrar-header">
-              <p className="label">Registrar Workspace</p>
+              <p className="label">Team 16</p>
               <h1>Welcome, {staffName}</h1>
-              <span>
-                Review land registration applications, documents, objections,
-                workflow status, and certificate issuance.
-              </span>
             </section>
 
             <section className="registrar-stats-grid">

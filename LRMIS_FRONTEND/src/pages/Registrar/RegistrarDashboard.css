@@ -5,39 +5,38 @@
 .registrar-page {
   min-height: 100vh;
   display: flex;
-  background: #f3f6f8;
-  color: #102033;
+  background: #eef2f7;
+  color: #111111;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
 }
 
 .registrar-sidebar {
-  width: 280px;
+  width: 200px;
   min-height: 100vh;
   position: fixed;
   inset: 0 auto 0 0;
   display: flex;
   flex-direction: column;
-  padding: 28px 20px;
-  background: linear-gradient(180deg, #102033 0%, #17283a 100%);
+  padding: 18px 14px;
+  background: #111111;
   color: #ffffff;
-  box-shadow: 12px 0 30px rgba(15, 23, 42, 0.16);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
 }
 
 .registrar-brand h2 {
   margin: 0;
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .registrar-brand p {
-  margin: 8px 0 34px;
-  color: #9fe1cb;
-  font-size: 13px;
-  font-weight: 800;
+  margin: 4px 0 20px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
 }
 
 .registrar-nav {
@@ -49,14 +48,14 @@
   width: 100%;
   border: 1px solid transparent;
   background: transparent;
-  color: #cbd5e1;
+  color: #d4d4d4;
   text-align: left;
-  padding: 14px 15px;
-  border-radius: 14px;
-  font-size: 14px;
-  font-weight: 800;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  transition: 0.18s ease;
+  transition: 0.15s ease;
 }
 
 .registrar-nav button:hover {
@@ -67,7 +66,7 @@
 }
 
 .registrar-nav button.active {
-  background: linear-gradient(135deg, #2a7f6f, #1f5f54);
+  background: #22c55e;
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: 0 10px 22px rgba(42, 127, 111, 0.28);
@@ -75,75 +74,67 @@
 
 .registrar-logout-btn {
   margin-top: auto;
-  border: 1px solid rgba(212, 83, 126, 0.45);
-  background: rgba(212, 83, 126, 0.14);
-  color: #f3a1a6;
-  padding: 14px 15px;
-  border-radius: 14px;
-  font-size: 14px;
-  font-weight: 800;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: 0.18s ease;
+  transition: 0.15s ease;
 }
 
 .registrar-logout-btn:hover {
-  background: #d4537e;
+  background: #ef4444;
   color: #ffffff;
-  transform: translateY(-1px);
 }
 
 .registrar-main {
-  margin-left: 280px;
-  width: calc(100% - 280px);
+  margin-left: 200px;
+  width: calc(100% - 200px);
   max-width: 100%;
   overflow-x: hidden;
-  padding: 34px;
+  padding: 20px;
 }
 
 .registrar-header {
   max-width: 100%;
-  margin-bottom: 20px;
-  background: linear-gradient(135deg, #102033, #284858);
+  margin-bottom: 16px;
+  background: #111111;
   color: #ffffff;
-  border-radius: 24px;
-  padding: 36px;
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+  border-radius: 10px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   position: relative;
   overflow: hidden;
 }
 
 .registrar-header::after {
-  content: "";
-  position: absolute;
-  width: 230px;
-  height: 230px;
-  right: -90px;
-  top: -100px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  display: none;
 }
 
 .registrar-header .label {
-  margin: 0 0 12px;
-  color: #9fe1cb;
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
+  margin: 0 0 6px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .registrar-header h1 {
-  margin: 0 0 12px;
-  font-size: 34px;
-  font-weight: 900;
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .registrar-header span {
   display: block;
-  max-width: 760px;
-  color: #d7e6f5;
-  line-height: 1.7;
-  font-size: 15px;
+  max-width: 600px;
+  color: #a3a3a3;
+  line-height: 1.5;
+  font-size: 12px;
 }
 
 .registrar-stats-grid {
@@ -155,54 +146,54 @@
 }
 
 .registrar-stat-card {
-  min-height: 92px;
+  min-height: auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
   background: #ffffff;
-  border: 1px solid #d9e2ec;
-  border-radius: 18px;
-  padding: 22px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .registrar-stat-card span {
   display: block;
-  color: #64748b;
-  font-size: 12px;
+  color: #737373;
+  font-size: 11px;
   line-height: 1.4;
-  font-weight: 800;
-  margin-bottom: 10px;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .registrar-stat-card strong {
   display: block;
-  color: #102033;
-  font-size: 30px;
+  color: #111111;
+  font-size: 24px;
   line-height: 1;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .registrar-panel {
   background: #ffffff;
-  border: 1px solid #d9e2ec;
-  border-radius: 22px;
-  padding: 28px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .registrar-panel h2 {
-  margin: 0 0 8px;
-  color: #102033;
-  font-size: 26px;
-  font-weight: 900;
+  margin: 0 0 4px;
+  color: #111111;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .registrar-panel p {
-  margin: 0 0 22px;
-  color: #64748b;
-  line-height: 1.7;
-  font-size: 15px;
+  margin: 0 0 14px;
+  color: #737373;
+  line-height: 1.5;
+  font-size: 12px;
 }
 
 .registrar-message {
@@ -263,7 +254,7 @@
 }
 
 .registrar-status-compact-row strong {
-  color: #102033;
+  color: #111111;
   font-size: 18px;
   font-weight: 900;
 }
@@ -287,7 +278,7 @@
 
 .registrar-application-row strong {
   display: block;
-  color: #102033;
+  color: #111111;
   font-size: 15px;
   margin-bottom: 4px;
 }
@@ -363,7 +354,7 @@
 
 .results-count {
   background: #eef7f5;
-  color: #2a7f6f;
+  color: #22c55e;
   border: 1px solid rgba(42, 127, 111, 0.25);
   border-radius: 999px;
   padding: 8px 14px;
@@ -380,20 +371,21 @@
 
 .applications-filters input,
 .applications-filters select {
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 14px;
-  background: #ffffff;
-  color: #102033;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  background: #fafafa;
+  color: #111111;
 }
 
 .applications-filters button {
   border: 0;
-  border-radius: 12px;
-  background: #1c2b3a;
+  border-radius: 6px;
+  background: #22c55e;
   color: #ffffff;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -424,7 +416,7 @@
 .applications-table td {
   padding: 14px;
   border-bottom: 1px solid #e5e7eb;
-  color: #102033;
+  color: #111111;
   font-size: 14px;
 }
 
@@ -451,7 +443,7 @@
 
 .status-legal_review {
   background: #eef7f5;
-  color: #2a7f6f;
+  color: #22c55e;
 }
 
 .status-approved,
@@ -469,7 +461,7 @@
 .table-action-btn {
   border: 0;
   border-radius: 10px;
-  background: #1c2b3a;
+  background: #111111;
   color: #ffffff;
   padding: 9px 12px;
   font-weight: 800;
@@ -492,7 +484,7 @@
 
 .application-preview-card h3 {
   margin: 0 0 6px;
-  color: #102033;
+  color: #111111;
   font-size: 22px;
 }
 
@@ -524,7 +516,7 @@
 }
 
 .preview-grid strong {
-  color: #102033;
+  color: #111111;
   font-size: 14px;
 }
 
@@ -565,7 +557,7 @@
 
 .application-details-card h3 {
   margin: 0 0 6px;
-  color: #102033;
+  color: #111111;
   font-size: 22px;
 }
 
@@ -582,7 +574,7 @@
 
 .details-section h4 {
   margin: 0 0 14px;
-  color: #102033;
+  color: #111111;
   font-size: 16px;
 }
 
@@ -608,7 +600,7 @@
 }
 
 .details-grid strong {
-  color: #102033;
+  color: #111111;
   font-size: 14px;
   word-break: break-word;
 }
@@ -639,7 +631,7 @@
 
 .staff-document-row strong {
   display: block;
-  color: #102033;
+  color: #111111;
   font-size: 14px;
 }
 
@@ -651,7 +643,7 @@
 }
 
 .staff-document-row a {
-  color: #2a7f6f;
+  color: #22c55e;
   font-weight: 800;
   text-decoration: none;
 }
@@ -669,7 +661,7 @@
 }
 
 .map-preview-card strong {
-  color: #102033;
+  color: #111111;
   font-size: 16px;
 }
 
@@ -708,7 +700,7 @@
 }
 
 .details-page-header {
-  background: linear-gradient(135deg, #102033, #284858);
+  background: #111111;
   color: #ffffff;
   border-radius: 24px;
   padding: 28px;
@@ -718,7 +710,7 @@
 
 .details-page-header .label {
   margin: 18px 0 8px;
-  color: #9fe1cb;
+  color: #86efac;
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.14em;
@@ -734,7 +726,7 @@
 
 .details-page-header span {
   display: block;
-  color: #d7e6f5;
+  color: #d4d4d4;
   line-height: 1.7;
   max-width: 780px;
 }
@@ -780,7 +772,7 @@
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 14px;
-  color: #102033;
+  color: #111111;
   background: #ffffff;
 }
 
@@ -829,7 +821,7 @@
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 14px;
-  color: #102033;
+  color: #111111;
   background: #ffffff;
 }
 
@@ -863,7 +855,7 @@
 
 .decision-action-card h5 {
   margin: 0;
-  color: #102033;
+  color: #111111;
   font-size: 15px;
   font-weight: 900;
 }
@@ -876,7 +868,7 @@
   border-radius: 12px;
   padding: 11px 13px;
   font-size: 14px;
-  color: #102033;
+  color: #111111;
   background: #ffffff;
   resize: vertical;
   outline: none;
@@ -884,7 +876,7 @@
 }
 
 .decision-action-card textarea:focus {
-  border-color: #2a7f6f;
+  border-color: #22c55e;
   box-shadow: 0 0 0 3px rgba(42, 127, 111, 0.12);
 }
 
@@ -906,7 +898,7 @@
 }
 
 .decision-primary-btn {
-  background: #1c2b3a;
+  background: #111111;
 }
 
 .danger-action-btn {
@@ -941,7 +933,7 @@
 }
 
 .review-documents-table a {
-  color: #2a7f6f;
+  color: #22c55e;
   font-weight: 800;
   text-decoration: none;
 }

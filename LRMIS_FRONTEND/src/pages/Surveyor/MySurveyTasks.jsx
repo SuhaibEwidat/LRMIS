@@ -159,12 +159,8 @@ function MySurveyTasks() {
     <>
       <section className="surveyor-page-header">
         <div>
-          <p className="surveyor-label">Surveyor Workspace</p>
+          <p className="surveyor-label">Team 16</p>
           <h1>My Survey Tasks</h1>
-          <span>
-            View assigned field survey tasks with parcel number, zone, priority,
-            scheduled visit date, and current milestone.
-          </span>
         </div>
       </section>
 
